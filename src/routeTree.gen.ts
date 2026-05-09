@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -28,34 +29,48 @@ const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
   path: '/attendance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/_authenticated/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/attendance'
+  fullPaths: '/' | '/login' | '/admin' | '/attendance'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/attendance'
-  id: '__root__' | '/' | '/login' | '/_authenticated/attendance'
+  to: '/' | '/login' | '/admin' | '/attendance'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/_authenticated/admin'
+    | '/_authenticated/attendance'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
 }
 
@@ -82,12 +97,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
 }
 export const routeTree = rootRouteImport
