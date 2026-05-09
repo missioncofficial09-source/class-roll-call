@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Building2, Users, BookOpen, UserPlus, GraduationCap, Clock, CircleDot, CheckCircle2, Circle } from "lucide-react";
+import { Building2, Users, BookOpen, UserPlus, GraduationCap, Clock, CircleDot, CheckCircle2, Circle, Coins } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -165,11 +165,12 @@ function AdminPage() {
       </div>
 
       <Tabs defaultValue="schools" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="schools">Schools</TabsTrigger>
           <TabsTrigger value="classes">Classes</TabsTrigger>
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="teachers">Teachers</TabsTrigger>
+          <TabsTrigger value="redemptions">Payouts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="schools" className="mt-4">
@@ -183,6 +184,9 @@ function AdminPage() {
         </TabsContent>
         <TabsContent value="teachers" className="mt-4">
           <TeachersPanel teachers={teachers} schools={schools} classes={classes} onChange={refresh} />
+        </TabsContent>
+        <TabsContent value="redemptions" className="mt-4">
+          <RedemptionsPanel teachers={teachers} />
         </TabsContent>
       </Tabs>
     </div>
