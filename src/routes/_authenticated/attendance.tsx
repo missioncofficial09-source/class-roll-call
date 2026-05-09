@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
 import { extractNamesFromImage } from "@/lib/extract-names.functions";
+import { WalletCard } from "@/components/WalletCard";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   head: () => ({ meta: [{ title: "Mark attendance — Hazira" }] }),
@@ -283,6 +284,8 @@ function AttendancePage() {
         <StatCard label="Absent" value={absentCount} tone="destructive" />
         <StatCard label="Pending" value={unmarked} tone="muted" />
       </div>
+
+      {role === "teacher" && user && <WalletCard userId={user.id} />}
 
       <div className="flex justify-between items-center mb-3">
         <span className="text-sm text-muted-foreground">{students.length} students</span>
