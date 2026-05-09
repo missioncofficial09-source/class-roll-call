@@ -31,6 +31,16 @@ function AttendancePage() {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
 
+  // --- Roster import (camera + voice) ---
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importNames, setImportNames] = useState<string[]>([]);
+  const [extracting, setExtracting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const extractFn = useServerFn(extractNamesFromImage);
+
   // Load assigned classes (teachers) or all classes (admin)
   useEffect(() => {
     if (!user) return;
@@ -116,6 +126,119 @@ function AttendancePage() {
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
+  // ---- Image → names (resize + AI OCR) ----
+  const fileToCompressedBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => { img.src = reader.result as string; };
+      reader.onerror = () => reject(new Error("Could not read file"));
+      img.onload = () => {
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas unavailable"));
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const base64 = dataUrl.split(",")[1] ?? "";
+        resolve({ base64, mimeType: "image/jpeg" });
+      };
+      img.onerror = () => reject(new Error("Invalid image"));
+      reader.readAsDataURL(file);
+    });
+
+  const onCameraFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!classId) { toast.error("Pick a class first"); return; }
+    setExtracting(true);
+    setImportOpen(true);
+    setImportNames([]);
+    try {
+      const { base64, mimeType } = await fileToCompressedBase64(file);
+      const res = await extractFn({ data: { imageBase64: base64, mimeType } });
+      const names = (res?.names ?? []) as string[];
+      if (names.length === 0) toast.warning("No names detected. Try a clearer photo.");
+      setImportNames(names);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not read register photo");
+      setImportOpen(false);
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  // ---- Voice → names ----
+  const startListening = () => {
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { toast.error("Voice input not supported in this browser"); return; }
+    if (!classId) { toast.error("Pick a class first"); return; }
+    if (!importOpen) setImportOpen(true);
+    const rec = new SR();
+    rec.lang = "en-IN";
+    rec.interimResults = false;
+    rec.continuous = true;
+    rec.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const phrase: string = event.results[i][0].transcript.trim();
+        if (!phrase) continue;
+        // Split on "next"/"comma"/"and" or punctuation so teachers can dictate multiple names
+        const parts = phrase
+          .split(/\b(?:next|comma|and)\b|[,\.;\n]/i)
+          .map((p) => p.trim())
+          .filter((p) => p.length > 1);
+        setImportNames((prev) => {
+          const existing = new Set(prev.map((n) => n.toLowerCase()));
+          const add = parts.filter((p) => !existing.has(p.toLowerCase()));
+          return [...prev, ...add];
+        });
+      }
+    };
+    rec.onerror = (e: any) => toast.error(`Mic error: ${e.error ?? "unknown"}`);
+    rec.onend = () => setListening(false);
+    rec.start();
+    recognitionRef.current = rec;
+    setListening(true);
+  };
+  const stopListening = () => {
+    try { recognitionRef.current?.stop(); } catch { /* noop */ }
+    setListening(false);
+  };
+
+  const updateImportName = (idx: number, value: string) =>
+    setImportNames((prev) => prev.map((n, i) => (i === idx ? value : n)));
+  const removeImportName = (idx: number) =>
+    setImportNames((prev) => prev.filter((_, i) => i !== idx));
+  const addBlankImportName = () => setImportNames((prev) => [...prev, ""]);
+
+  const confirmImport = async () => {
+    if (!classId) return;
+    const cleaned = importNames.map((n) => n.trim()).filter((n) => n.length > 1);
+    if (cleaned.length === 0) { toast.error("No names to add"); return; }
+    // Avoid duplicates already in the class
+    const existing = new Set(students.map((s) => s.full_name.toLowerCase()));
+    const fresh = cleaned.filter((n) => !existing.has(n.toLowerCase()));
+    if (fresh.length === 0) { toast.info("All names already in this class"); setImportOpen(false); return; }
+    const startRoll = (students.reduce((m, s) => Math.max(m, s.roll_number ?? 0), 0)) + 1;
+    const rows = fresh.map((full_name, i) => ({ class_id: classId, full_name, roll_number: startRoll + i }));
+    setImporting(true);
+    const { error } = await supabase.from("students").insert(rows);
+    setImporting(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Added ${rows.length} student${rows.length === 1 ? "" : "s"}`);
+    setImportOpen(false);
+    setImportNames([]);
+    // Reload students
+    const { data: s } = await supabase.from("students").select("id, full_name, roll_number").eq("class_id", classId).order("roll_number", { nullsFirst: false }).order("full_name");
+    setStudents((s as Student[]) ?? []);
+  };
+
   if (classes.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
@@ -160,7 +283,35 @@ function AttendancePage() {
 
       <div className="flex justify-between items-center mb-3">
         <span className="text-sm text-muted-foreground">{students.length} students</span>
-        <Button variant="ghost" size="sm" onClick={markAllPresent}>Mark all present</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={!classId}
+            title="Scan register photo"
+          >
+            <Camera className="h-4 w-4 mr-1.5" /> Scan register
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setImportOpen(true); }}
+            disabled={!classId}
+            title="Add names by voice"
+          >
+            <Mic className="h-4 w-4 mr-1.5" /> Voice add
+          </Button>
+          <Button variant="ghost" size="sm" onClick={markAllPresent}>Mark all present</Button>
+        </div>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={onCameraFile}
+        />
       </div>
 
       <div className="rounded-2xl border border-border overflow-hidden bg-card divide-y divide-border">
@@ -220,6 +371,64 @@ function AttendancePage() {
           </div>
         </div>
       )}
+
+      {/* Import dialog: camera OCR results + voice dictation */}
+      <Dialog
+        open={importOpen}
+        onOpenChange={(o) => {
+          if (!o) { stopListening(); setImportOpen(false); }
+          else setImportOpen(true);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add students to {cls?.name ?? "class"}</DialogTitle>
+            <DialogDescription>
+              Review the names below. Edit, remove, or add more before saving. Use the mic to dictate names — say each name and pause, or separate with "next".
+            </DialogDescription>
+          </DialogHeader>
+
+          {extracting ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" /> Reading register photo…
+            </div>
+          ) : (
+            <div className="max-h-72 overflow-y-auto space-y-2 py-1">
+              {importNames.length === 0 && (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No names yet. Tap the mic to dictate, or close and use “Scan register”.
+                </p>
+              )}
+              {importNames.map((n, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="w-6 text-xs font-mono text-muted-foreground">{i + 1}</span>
+                  <Input value={n} onChange={(e) => updateImportName(i, e.target.value)} placeholder="Student full name" />
+                  <Button variant="ghost" size="icon" onClick={() => removeImportName(i)} aria-label="Remove">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addBlankImportName} className="w-full mt-2">
+                <Plus className="h-4 w-4 mr-1.5" /> Add another name
+              </Button>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+            <Button
+              variant={listening ? "destructive" : "outline"}
+              onClick={listening ? stopListening : startListening}
+              className="sm:mr-auto"
+            >
+              {listening ? (<><MicOff className="h-4 w-4 mr-2" /> Stop</>) : (<><Mic className="h-4 w-4 mr-2" /> Dictate</>)}
+            </Button>
+            <Button variant="ghost" onClick={() => { stopListening(); setImportOpen(false); }}>Cancel</Button>
+            <Button onClick={confirmImport} disabled={importing || extracting || importNames.length === 0}>
+              {importing ? "Adding…" : `Add ${importNames.filter((n) => n.trim().length > 1).length || ""} students`.trim()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
