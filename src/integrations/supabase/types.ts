@@ -104,6 +104,30 @@ export type Database = {
           },
         ]
       }
+      coin_transactions: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          reason: string
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          reason: string
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          reason?: string
+          teacher_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -132,6 +156,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      redemptions: {
+        Row: {
+          amount_inr: number
+          coins: number
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          status: Database["public"]["Enums"]["redemption_status"]
+          teacher_id: string
+          upi_id: string | null
+        }
+        Insert: {
+          amount_inr: number
+          coins: number
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["redemption_status"]
+          teacher_id: string
+          upi_id?: string | null
+        }
+        Update: {
+          amount_inr?: number
+          coins?: number
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["redemption_status"]
+          teacher_id?: string
+          upi_id?: string | null
+        }
+        Relationships: []
       }
       schools: {
         Row: {
@@ -230,6 +290,24 @@ export type Database = {
         }
         Relationships: []
       }
+      wallets: {
+        Row: {
+          balance: number
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -251,6 +329,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "teacher"
       attendance_status: "present" | "absent"
+      redemption_status: "pending" | "approved" | "paid" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -380,6 +459,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "teacher"],
       attendance_status: ["present", "absent"],
+      redemption_status: ["pending", "approved", "paid", "rejected"],
     },
   },
 } as const
