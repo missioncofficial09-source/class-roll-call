@@ -202,6 +202,21 @@ function Stat({ label, value, tone, icon: Icon }: { label: string; value: number
   );
 }
 
+function StatusPill({ status }: { status: "completed" | "in_progress" | "not_started" }) {
+  const config = {
+    completed: { label: "Completed", Icon: CheckCircle2, cls: "bg-success/15 text-success border-success/30" },
+    in_progress: { label: "In progress", Icon: CircleDot, cls: "bg-warning/15 text-warning border-warning/30 animate-pulse" },
+    not_started: { label: "Not started", Icon: Circle, cls: "bg-muted text-muted-foreground border-border" },
+  }[status];
+  const Icon = config.Icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold whitespace-nowrap ${config.cls}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {config.label}
+    </span>
+  );
+}
+
 function SchoolsPanel({ schools, onChange }: { schools: School[]; onChange: () => void }) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
