@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Building2, Users, BookOpen, UserPlus, GraduationCap } from "lucide-react";
+import { Building2, Users, BookOpen, UserPlus, GraduationCap, Clock, CircleDot, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -33,6 +33,7 @@ function AdminPage() {
   const [todayPresent, setTodayPresent] = useState(0);
   const [todayAbsent, setTodayAbsent] = useState(0);
   const [perSchool, setPerSchool] = useState<{ school_id: string; present: number; absent: number; total: number }[]>([]);
+  const [classRecords, setClassRecords] = useState<{ class_id: string; status: string; created_at: string; recorded_by: string | null }[]>([]);
 
   const refresh = async () => {
     const [{ data: s }, { data: c }, { data: st }, { data: p }, { data: a }] = await Promise.all([
@@ -40,13 +41,14 @@ function AdminPage() {
       supabase.from("classes").select("id, name, grade, school_id").order("name"),
       supabase.from("students").select("id, full_name, roll_number, class_id"),
       supabase.from("profiles").select("id, full_name, school_id"),
-      supabase.from("attendance_records").select("school_id, status").eq("date", today),
+      supabase.from("attendance_records").select("school_id, class_id, status, created_at, recorded_by").eq("date", today),
     ]);
     setSchools((s as School[]) ?? []);
     setClasses((c as ClassRow[]) ?? []);
     setStudents((st as StudentRow[]) ?? []);
     setTeachers((p as ProfileRow[]) ?? []);
-    const records = (a as { school_id: string; status: string }[]) ?? [];
+    const records = (a as { school_id: string; class_id: string; status: string; created_at: string; recorded_by: string | null }[]) ?? [];
+    setClassRecords(records);
     setTodayPresent(records.filter((r) => r.status === "present").length);
     setTodayAbsent(records.filter((r) => r.status === "absent").length);
     const map = new Map<string, { present: number; absent: number; total: number }>();
@@ -60,11 +62,32 @@ function AdminPage() {
     setPerSchool(Array.from(map.entries()).map(([school_id, v]) => ({ school_id, ...v })));
   };
 
-  useEffect(() => { if (role === "admin") void refresh(); }, [role]);
+  useEffect(() => {
+    if (role !== "admin") return;
+    void refresh();
+    const channel = supabase
+      .channel("admin-attendance")
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance_records" }, () => {
+        void refresh();
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [role]);
 
   if (loading || role !== "admin") return null;
 
   const totalStudents = students.length;
+
+  const classStatuses = classes.map((c) => {
+    const recs = classRecords.filter((r) => r.class_id === c.id);
+    const totalStudentsInClass = students.filter((s) => s.class_id === c.id).length;
+    const marked = recs.length;
+    const lastTs = recs.reduce<string | null>((acc, r) => (!acc || r.created_at > acc ? r.created_at : acc), null);
+    let status: "completed" | "in_progress" | "not_started" = "not_started";
+    if (totalStudentsInClass > 0 && marked >= totalStudentsInClass) status = "completed";
+    else if (marked > 0) status = "in_progress";
+    return { class: c, totalStudents: totalStudentsInClass, marked, lastTs, status };
+  });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -110,6 +133,37 @@ function AdminPage() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-border bg-card overflow-hidden mb-8">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="font-semibold">Class submission status — today</div>
+          <div className="text-xs text-muted-foreground flex items-center gap-1"><CircleDot className="h-3 w-3" /> Live</div>
+        </div>
+        <div className="divide-y divide-border">
+          {classStatuses.length === 0 && <div className="p-6 text-center text-muted-foreground text-sm">No classes yet.</div>}
+          {classStatuses.map(({ class: c, totalStudents: tot, marked, lastTs, status }) => {
+            const sc = schools.find((s) => s.id === c.school_id);
+            return (
+              <div key={c.id} className="p-4 flex items-center gap-4">
+                <StatusPill status={status} />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{c.name}{c.grade ? ` · ${c.grade}` : ""}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {sc?.name ?? "—"} • {marked}/{tot} marked
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Submitted</div>
+                  <div className="text-sm font-semibold tabular-nums flex items-center justify-end gap-1">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    {lastTs ? new Date(lastTs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <Tabs defaultValue="schools" className="w-full">
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="schools">Schools</TabsTrigger>
@@ -145,6 +199,21 @@ function Stat({ label, value, tone, icon: Icon }: { label: string; value: number
       </div>
       <div className={`text-3xl font-bold mt-2 tabular-nums ${colors}`}>{value}</div>
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: "completed" | "in_progress" | "not_started" }) {
+  const config = {
+    completed: { label: "Completed", Icon: CheckCircle2, cls: "bg-success/15 text-success border-success/30" },
+    in_progress: { label: "In progress", Icon: CircleDot, cls: "bg-warning/15 text-warning border-warning/30 animate-pulse" },
+    not_started: { label: "Not started", Icon: Circle, cls: "bg-muted text-muted-foreground border-border" },
+  }[status];
+  const Icon = config.Icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold whitespace-nowrap ${config.cls}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {config.label}
+    </span>
   );
 }
 
