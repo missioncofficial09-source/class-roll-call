@@ -1,16 +1,31 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { createClient } from "@supabase/supabase-js";
 
 const InputSchema = z.object({
   imageBase64: z.string().min(100),
   mimeType: z.string().default("image/jpeg"),
+  accessToken: z.string().min(10),
 });
 
 export const extractNamesFromImage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((data) => InputSchema.parse(data))
   .handler(async ({ data }) => {
+    // Verify the caller is a signed-in user (gateway uses our server-side key,
+    // so we gate access via their Supabase session token).
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+      throw new Response("Backend not configured", { status: 500 });
+    }
+    const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: claims, error: authErr } = await sb.auth.getClaims(data.accessToken);
+    if (authErr || !claims?.claims?.sub) {
+      throw new Response("Unauthorized", { status: 401 });
+    }
+
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       throw new Response("AI gateway not configured", { status: 500 });
