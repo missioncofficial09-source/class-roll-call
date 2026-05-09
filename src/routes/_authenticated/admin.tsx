@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Building2, Users, BookOpen, UserPlus, GraduationCap, Clock, CircleDot, CheckCircle2, Circle } from "lucide-react";
+import { Building2, Users, BookOpen, UserPlus, GraduationCap, Clock, CircleDot, CheckCircle2, Circle, Coins } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -165,11 +165,12 @@ function AdminPage() {
       </div>
 
       <Tabs defaultValue="schools" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="schools">Schools</TabsTrigger>
           <TabsTrigger value="classes">Classes</TabsTrigger>
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="teachers">Teachers</TabsTrigger>
+          <TabsTrigger value="redemptions">Payouts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="schools" className="mt-4">
@@ -183,6 +184,9 @@ function AdminPage() {
         </TabsContent>
         <TabsContent value="teachers" className="mt-4">
           <TeachersPanel teachers={teachers} schools={schools} classes={classes} onChange={refresh} />
+        </TabsContent>
+        <TabsContent value="redemptions" className="mt-4">
+          <RedemptionsPanel teachers={teachers} />
         </TabsContent>
       </Tabs>
     </div>
@@ -407,6 +411,111 @@ function TeachersPanel({ teachers, schools, classes, onChange }: { teachers: Pro
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+type RedemptionRow = {
+  id: string;
+  teacher_id: string;
+  coins: number;
+  amount_inr: string | number;
+  upi_id: string | null;
+  status: "pending" | "approved" | "paid" | "rejected";
+  created_at: string;
+};
+
+function RedemptionsPanel({ teachers }: { teachers: ProfileRow[] }) {
+  const [rows, setRows] = useState<RedemptionRow[]>([]);
+  const [wallets, setWallets] = useState<{ teacher_id: string; balance: number }[]>([]);
+
+  const load = async () => {
+    const [{ data: r }, { data: w }] = await Promise.all([
+      supabase.from("redemptions").select("*").order("created_at", { ascending: false }),
+      supabase.from("wallets").select("teacher_id, balance"),
+    ]);
+    setRows((r as RedemptionRow[]) ?? []);
+    setWallets(w ?? []);
+  };
+  useEffect(() => {
+    void load();
+    const ch = supabase
+      .channel("admin-redemptions")
+      .on("postgres_changes", { event: "*", schema: "public", table: "redemptions" }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "wallets" }, () => void load())
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, []);
+
+  const setStatus = async (id: string, status: RedemptionRow["status"]) => {
+    const { error } = await supabase
+      .from("redemptions")
+      .update({ status, decided_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success(`Marked ${status}`);
+  };
+
+  const teacherName = (id: string) => teachers.find((t) => t.id === id)?.full_name ?? id.slice(0, 8);
+  const pending = rows.filter((r) => r.status === "pending");
+  const history = rows.filter((r) => r.status !== "pending");
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="font-semibold mb-3 flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> Teacher wallets</div>
+        <ul className="divide-y divide-border max-h-72 overflow-auto">
+          {wallets.length === 0 && <li className="text-sm text-muted-foreground py-3">No wallet activity yet.</li>}
+          {wallets.sort((a, b) => b.balance - a.balance).map((w) => (
+            <li key={w.teacher_id} className="py-2 flex justify-between text-sm">
+              <span className="font-medium">{teacherName(w.teacher_id)}</span>
+              <span className="tabular-nums">
+                {w.balance.toLocaleString()} coins
+                <span className="text-success ml-2">≈ ₹{(w.balance / 100).toFixed(2)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="font-semibold mb-3">Pending payouts ({pending.length})</div>
+        <ul className="divide-y divide-border">
+          {pending.length === 0 && <li className="text-sm text-muted-foreground py-3">No pending requests.</li>}
+          {pending.map((r) => (
+            <li key={r.id} className="py-3 flex flex-wrap items-center gap-3">
+              <div className="flex-1 min-w-[180px]">
+                <div className="font-medium">{teacherName(r.teacher_id)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {r.coins.toLocaleString()} coins · ₹{Number(r.amount_inr).toFixed(2)} · UPI: <code>{r.upi_id ?? "—"}</code>
+                </div>
+                <div className="text-[11px] text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
+              </div>
+              <Button size="sm" onClick={() => setStatus(r.id, "paid")}>Mark paid</Button>
+              <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "approved")}>Approve</Button>
+              <Button size="sm" variant="ghost" onClick={() => setStatus(r.id, "rejected")}>Reject</Button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="font-semibold mb-3">History</div>
+        <ul className="divide-y divide-border max-h-80 overflow-auto">
+          {history.length === 0 && <li className="text-sm text-muted-foreground py-3">No past payouts.</li>}
+          {history.map((r) => (
+            <li key={r.id} className="py-2 flex justify-between text-sm">
+              <span>
+                <span className="font-medium">{teacherName(r.teacher_id)}</span>
+                <span className="text-muted-foreground"> · {r.coins.toLocaleString()} coins · ₹{Number(r.amount_inr).toFixed(2)}</span>
+              </span>
+              <span className={`text-xs font-semibold uppercase ${r.status === "paid" ? "text-success" : r.status === "rejected" ? "text-destructive" : "text-warning"}`}>
+                {r.status}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
