@@ -110,11 +110,14 @@ function AttendancePage() {
     toast.success(`Saved ${rows.length} records`);
   };
 
-  const sendWhatsApp = async () => {
-    if (!cls) return;
-    // Save first so the coin wallet trigger fires before navigating away.
-    await save();
-    const parts: string[] = [`Hazira Report - ${cls.name}`, `Date: ${new Date(today).toDateString()}`];
+  // Build the wa.me URL from current state — used as a direct <a href>
+  // so the browser navigates the top frame and bypasses CSP/popup blockers.
+  const whatsappHref = useMemo(() => {
+    if (!cls) return "https://wa.me/";
+    const parts: string[] = [
+      `Hazira Report - ${cls.name}`,
+      `Date: ${new Date(today).toDateString()}`,
+    ];
     students.forEach((s, i) => {
       const status = marks[s.id];
       const label = status === "present" ? "Present ✅" : status === "absent" ? "Absent ❌" : "Not marked";
@@ -122,9 +125,8 @@ function AttendancePage() {
     });
     parts.push(`Total Present: ${presentCount} | Total Absent: ${absentCount}`);
     const encodedMessage = parts.map(encodeURIComponent).join("%0A");
-    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
-    window.open(whatsappUrl, "_blank");
-  };
+    return `https://wa.me/?text=${encodedMessage}`;
+  }, [cls, students, marks, today, presentCount, absentCount]);
 
   // ---- Image → names (resize + AI OCR) ----
   const fileToCompressedBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
@@ -365,14 +367,16 @@ function AttendancePage() {
             <Button variant="outline" size="lg" onClick={save} disabled={saving} className="flex-1 sm:flex-none">
               <Save className="h-4 w-4 mr-2" /> {saving ? "Saving…" : "Save"}
             </Button>
-            <Button
-              size="lg"
-              onClick={sendWhatsApp}
-              className="flex-1 h-12 text-base font-semibold text-success-foreground hover:opacity-90"
+            <a
+              href={whatsappHref}
+              target="_top"
+              rel="noopener noreferrer"
+              onClick={() => { void save(); }}
+              className="flex-1 h-12 inline-flex items-center justify-center rounded-md text-base font-semibold text-success-foreground hover:opacity-90 transition-opacity"
               style={{ background: "linear-gradient(135deg, oklch(0.62 0.16 150), oklch(0.55 0.17 155))" }}
             >
               <MessageCircle className="h-5 w-5 mr-2" /> Send to WhatsApp
-            </Button>
+            </a>
           </div>
         </div>
       )}
