@@ -21,6 +21,18 @@ export const Route = createFileRoute("/_authenticated/attendance")({
 type Status = "present" | "absent";
 type Student = { id: string; full_name: string; roll_number: number | null };
 type ClassRow = { id: string; name: string; grade: string | null; school_id: string; whatsapp_group_name: string | null; school: { name: string } | null };
+type WeeklyRecord = { student_id: string; status: Status; date: string };
+
+const localDateKey = (date = new Date()) => {
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 10);
+};
+
+const shiftDateKey = (dateKey: string, days: number) => {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return localDateKey(date);
+};
 
 function AttendancePage() {
   const { user, role } = useAuth();
@@ -30,7 +42,8 @@ function AttendancePage() {
   const [marks, setMarks] = useState<Record<string, Status>>({});
   const [saving, setSaving] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const [today, setToday] = useState(() => localDateKey());
+  const [weeklyRecords, setWeeklyRecords] = useState<WeeklyRecord[]>([]);
 
   // --- Roster import (camera + voice) ---
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +54,14 @@ function AttendancePage() {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const extractFn = useServerFn(extractNamesFromImage);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const nextToday = localDateKey();
+      setToday((current) => (current === nextToday ? current : nextToday));
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Load assigned classes (teachers) or all classes (admin)
   useEffect(() => {
@@ -62,16 +83,19 @@ function AttendancePage() {
 
   // Load students + today's existing attendance
   useEffect(() => {
-    if (!classId) { setStudents([]); setMarks({}); return; }
+    if (!classId) { setStudents([]); setMarks({}); setWeeklyRecords([]); return; }
     setLoadingStudents(true);
+    const weekStart = shiftDateKey(today, -6);
     (async () => {
-      const [{ data: s, error: e1 }, { data: a }] = await Promise.all([
+      const [{ data: s, error: e1 }, { data: a }, { data: weekly }] = await Promise.all([
         supabase.from("students").select("id, full_name, roll_number").eq("class_id", classId).order("roll_number", { nullsFirst: false }).order("full_name"),
         supabase.from("attendance_records").select("student_id, status").eq("class_id", classId).eq("date", today),
+        supabase.from("attendance_records").select("student_id, status, date").eq("class_id", classId).gte("date", weekStart).lte("date", today),
       ]);
       setLoadingStudents(false);
       if (e1) return toast.error(e1.message);
       setStudents((s as Student[]) ?? []);
+      setWeeklyRecords((weekly as WeeklyRecord[]) ?? []);
       const m: Record<string, Status> = {};
       (a ?? []).forEach((r: any) => { m[r.student_id] = r.status; });
       setMarks(m);
