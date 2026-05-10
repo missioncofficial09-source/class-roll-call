@@ -138,6 +138,14 @@ function AttendancePage() {
   // so the browser navigates the top frame and bypasses CSP/popup blockers.
   const whatsappHref = useMemo(() => {
     if (!cls) return "https://wa.me/";
+    const lastSevenDates = new Set(Array.from({ length: 7 }, (_, i) => shiftDateKey(today, i - 6)));
+    const statusByStudentDay = new Map<string, Status>();
+    weeklyRecords.forEach((record) => {
+      if (lastSevenDates.has(record.date)) statusByStudentDay.set(`${record.student_id}:${record.date}`, record.status);
+    });
+    Object.entries(marks).forEach(([studentId, status]) => {
+      statusByStudentDay.set(`${studentId}:${today}`, status);
+    });
     const parts: string[] = [
       `Hazira Report - ${cls.name}`,
       `Date: ${new Date(today).toDateString()}`,
@@ -148,9 +156,20 @@ function AttendancePage() {
       parts.push(`- ${s.roll_number ?? i + 1}. ${s.full_name}: ${label}`);
     });
     parts.push(`Total Present: ${presentCount} | Total Absent: ${absentCount}`);
+    parts.push("", "7-Day Behavior Report");
+    students.forEach((s, i) => {
+      let weeklyPresent = 0;
+      let weeklyAbsent = 0;
+      lastSevenDates.forEach((dateKey) => {
+        const status = statusByStudentDay.get(`${s.id}:${dateKey}`);
+        if (status === "present") weeklyPresent += 1;
+        if (status === "absent") weeklyAbsent += 1;
+      });
+      parts.push(`- ${s.roll_number ?? i + 1}. ${s.full_name}: Present ${weeklyPresent}/7 | Absent ${weeklyAbsent}/7`);
+    });
     const encodedMessage = parts.map(encodeURIComponent).join("%0A");
     return `https://wa.me/?text=${encodedMessage}`;
-  }, [cls, students, marks, today, presentCount, absentCount]);
+  }, [cls, students, marks, weeklyRecords, today, presentCount, absentCount]);
 
   // ---- Image → names (resize + AI OCR) ----
   const fileToCompressedBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
