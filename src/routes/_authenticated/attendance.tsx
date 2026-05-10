@@ -121,7 +121,7 @@ function AttendancePage() {
       parts.push(`- ${s.roll_number ?? i + 1}. ${s.full_name}: ${label}`);
     });
     parts.push(`Total Present: ${presentCount} | Total Absent: ${absentCount}`);
-    const encodedMessage = parts.join("%0A");
+    const encodedMessage = parts.map(encodeURIComponent).join("%0A");
     const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
     window.open(whatsappUrl, "_blank");
   };
