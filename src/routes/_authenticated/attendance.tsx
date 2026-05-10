@@ -369,9 +369,8 @@ function AttendancePage() {
             </Button>
             <a
               href={whatsappHref}
-              target="_top"
-              rel="noopener noreferrer"
-              onClick={() => { void save(); }}
+              target="_blank"
+              rel="noopener"
               className="flex-1 h-12 inline-flex items-center justify-center rounded-md text-base font-semibold text-success-foreground hover:opacity-90 transition-opacity"
               style={{ background: "linear-gradient(135deg, oklch(0.62 0.16 150), oklch(0.55 0.17 155))" }}
             >
