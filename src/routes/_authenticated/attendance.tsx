@@ -110,21 +110,24 @@ function AttendancePage() {
     toast.success(`Saved ${rows.length} records`);
   };
 
-  const sendWhatsApp = async () => {
+  const sendWhatsApp = () => {
     if (!cls) return;
-    await save();
-    const absentees = students.filter((s) => marks[s.id] === "absent").map((s) => `• ${s.full_name}`).join("\n");
-    const lines = [
-      `📋 *${cls.school?.name ?? "School"} — ${cls.name} attendance*`,
-      `🗓 ${new Date(today).toDateString()}`,
+    const lines: string[] = [
+      `*Hazira Report - ${cls.name}*`,
+      `Date: ${new Date(today).toDateString()}`,
       ``,
-      `✅ Present: ${presentCount}`,
-      `❌ Absent: ${absentCount}`,
-      `👥 Total: ${students.length}`,
     ];
-    if (absentees) lines.push("", "*Absent students:*", absentees);
+    students.forEach((s, i) => {
+      const status = marks[s.id];
+      const label = status === "present" ? "Present ✅" : status === "absent" ? "Absent ❌" : "Not marked";
+      lines.push(`${s.roll_number ?? i + 1}. ${s.full_name}: ${label}`);
+    });
+    lines.push("", `Total Present: ${presentCount} | Total Absent: ${absentCount}`);
     const text = encodeURIComponent(lines.join("\n"));
-    window.open(`https://wa.me/?text=${text}`, "_blank");
+    // Open synchronously inside the click gesture so popup blockers don't block it.
+    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
+    // Persist attendance in the background — keeps coin-wallet trigger intact.
+    void save();
   };
 
   // ---- Image → names (resize + AI OCR) ----
