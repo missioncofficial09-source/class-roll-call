@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { loading, session, role, fullName } = useAuth();
+  const { loading, session, role, fullName, schoolName, schoolLogoUrl } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,7 +21,7 @@ function AuthenticatedLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader role={role} name={fullName} />
+      <AppHeader role={role} name={fullName} schoolName={schoolName} schoolLogoUrl={schoolLogoUrl} />
       <Outlet />
     </div>
   );
