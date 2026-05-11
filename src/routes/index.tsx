@@ -22,7 +22,11 @@ function Index() {
   useEffect(() => {
     if (loading) return;
     if (session) {
-      navigate({ to: role === "admin" ? "/admin" : "/attendance" });
+      const dest =
+        role === "admin" ? "/admin" :
+        role === "principal" ? "/principal" :
+        "/attendance";
+      navigate({ to: dest });
     }
   }, [loading, session, role, navigate]);
 

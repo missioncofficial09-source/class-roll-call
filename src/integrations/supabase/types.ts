@@ -128,6 +128,48 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_reports: {
+        Row: {
+          absent_days: number
+          academic_notes: string | null
+          attendance_pct: number
+          behavior_notes: string | null
+          class_id: string
+          generated_at: string
+          id: string
+          month: string
+          present_days: number
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          absent_days?: number
+          academic_notes?: string | null
+          attendance_pct?: number
+          behavior_notes?: string | null
+          class_id: string
+          generated_at?: string
+          id?: string
+          month: string
+          present_days?: number
+          school_id: string
+          student_id: string
+        }
+        Update: {
+          absent_days?: number
+          academic_notes?: string | null
+          attendance_pct?: number
+          behavior_notes?: string | null
+          class_id?: string
+          generated_at?: string
+          id?: string
+          month?: string
+          present_days?: number
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -198,18 +240,21 @@ export type Database = {
           code: string | null
           created_at: string
           id: string
+          logo_url: string | null
           name: string
         }
         Insert: {
           code?: string | null
           created_at?: string
           id?: string
+          logo_url?: string | null
           name: string
         }
         Update: {
           code?: string | null
           created_at?: string
           id?: string
+          logo_url?: string | null
           name?: string
         }
         Relationships: []
@@ -220,6 +265,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          parent_phone: string | null
           roll_number: number | null
         }
         Insert: {
@@ -227,6 +273,7 @@ export type Database = {
           created_at?: string
           full_name: string
           id?: string
+          parent_phone?: string | null
           roll_number?: number | null
         }
         Update: {
@@ -234,6 +281,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          parent_phone?: string | null
           roll_number?: number | null
         }
         Relationships: [
@@ -271,6 +319,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      teacher_notes: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          note: string
+          school_id: string
+          student_id: string
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          note: string
+          school_id: string
+          student_id: string
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string
+          school_id?: string
+          student_id?: string
+          teacher_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -327,7 +405,7 @@ export type Database = {
       user_school_id: { Args: { _user_id: string }; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "teacher"
+      app_role: "admin" | "teacher" | "principal"
       attendance_status: "present" | "absent"
       redemption_status: "pending" | "approved" | "paid" | "rejected"
     }
@@ -457,7 +535,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "teacher"],
+      app_role: ["admin", "teacher", "principal"],
       attendance_status: ["present", "absent"],
       redemption_status: ["pending", "approved", "paid", "rejected"],
     },
