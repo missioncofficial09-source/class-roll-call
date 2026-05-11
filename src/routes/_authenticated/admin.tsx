@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
 });
 
-type School = { id: string; name: string; code: string | null };
+type School = { id: string; name: string; code: string | null; logo_url: string | null };
 type ClassRow = { id: string; name: string; grade: string | null; school_id: string };
 type StudentRow = { id: string; full_name: string; roll_number: number | null; class_id: string };
 type ProfileRow = { id: string; full_name: string | null; school_id: string | null };
@@ -23,7 +23,12 @@ type ProfileRow = { id: string; full_name: string | null; school_id: string | nu
 function AdminPage() {
   const { role, loading } = useAuth();
   const navigate = useNavigate();
-  useEffect(() => { if (!loading && role !== "admin") navigate({ to: "/attendance" }); }, [loading, role, navigate]);
+  useEffect(() => {
+    if (loading) return;
+    if (role !== "admin") {
+      navigate({ to: role === "principal" ? "/principal" : "/attendance" });
+    }
+  }, [loading, role, navigate]);
 
   const today = new Date().toISOString().slice(0, 10);
   const [schools, setSchools] = useState<School[]>([]);
@@ -37,7 +42,7 @@ function AdminPage() {
 
   const refresh = async () => {
     const [{ data: s }, { data: c }, { data: st }, { data: p }, { data: a }] = await Promise.all([
-      supabase.from("schools").select("id, name, code").order("name"),
+      supabase.from("schools").select("id, name, code, logo_url").order("name"),
       supabase.from("classes").select("id, name, grade, school_id").order("name"),
       supabase.from("students").select("id, full_name, roll_number, class_id"),
       supabase.from("profiles").select("id, full_name, school_id"),
@@ -230,6 +235,20 @@ function SchoolsPanel({ schools, onChange }: { schools: School[]; onChange: () =
     if (error) return toast.error(error.message);
     setName(""); setCode(""); onChange(); toast.success("School added");
   };
+  const uploadLogo = async (school: School, file: File) => {
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${school.id}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("school-logos")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) return toast.error(upErr.message);
+    const { data } = supabase.storage.from("school-logos").getPublicUrl(path);
+    const url = `${data.publicUrl}?v=${Date.now()}`;
+    const { error } = await supabase.from("schools").update({ logo_url: url }).eq("id", school.id);
+    if (error) return toast.error(error.message);
+    toast.success("Logo updated");
+    onChange();
+  };
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-wrap gap-2 mb-4">
@@ -239,9 +258,29 @@ function SchoolsPanel({ schools, onChange }: { schools: School[]; onChange: () =
       </div>
       <ul className="divide-y divide-border">
         {schools.map((s) => (
-          <li key={s.id} className="py-2.5 flex justify-between text-sm">
-            <span className="font-medium">{s.name}</span>
-            <span className="text-muted-foreground">{s.code}</span>
+          <li key={s.id} className="py-3 flex items-center gap-3 text-sm">
+            {s.logo_url ? (
+              <img src={s.logo_url} alt={s.name} className="h-10 w-10 rounded-lg object-cover border border-border" />
+            ) : (
+              <div className="h-10 w-10 rounded-lg bg-muted border border-border flex items-center justify-center text-xs text-muted-foreground">—</div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">{s.name}</div>
+              <div className="text-xs text-muted-foreground">{s.code ?? "no code"}</div>
+            </div>
+            <label className="cursor-pointer text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-muted">
+              {s.logo_url ? "Replace logo" : "Upload logo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void uploadLogo(s, f);
+                }}
+              />
+            </label>
           </li>
         ))}
         {schools.length === 0 && <li className="text-muted-foreground text-sm py-3">No schools yet.</li>}
