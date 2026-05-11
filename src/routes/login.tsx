@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { GraduationCap } from "lucide-react";
+import logoDefault from "@/assets/logo.jpeg";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Hazira" }] }),
@@ -32,9 +32,7 @@ function LoginPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-10 text-primary-foreground" style={{ background: "var(--gradient-hero)" }}>
         <Link to="/" className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center">
-            <GraduationCap className="h-5 w-5" />
-          </div>
+          <img src={logoDefault} alt="Hazira logo" className="h-9 w-9 rounded-xl object-cover" />
           <span className="font-semibold">Hazira</span>
         </Link>
         <div>

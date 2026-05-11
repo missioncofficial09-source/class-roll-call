@@ -36,6 +36,7 @@ const shiftDateKey = (dateKey: string, days: number) => {
 
 function AttendancePage() {
   const { user, role } = useAuth();
+  const navigate = (window as any).__navigate; // unused; keep redirect via router below
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [classId, setClassId] = useState<string>("");
   const [students, setStudents] = useState<Student[]>([]);
