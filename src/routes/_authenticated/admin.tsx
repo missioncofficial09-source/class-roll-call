@@ -170,28 +170,12 @@ function AdminPage() {
       </div>
 
       <Tabs defaultValue="schools" className="w-full">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-1 w-full max-w-xs">
           <TabsTrigger value="schools">Schools</TabsTrigger>
-          <TabsTrigger value="classes">Classes</TabsTrigger>
-          <TabsTrigger value="students">Students</TabsTrigger>
-          <TabsTrigger value="teachers">Teachers</TabsTrigger>
-          <TabsTrigger value="redemptions">Payouts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="schools" className="mt-4">
           <SchoolsPanel schools={schools} onChange={refresh} />
-        </TabsContent>
-        <TabsContent value="classes" className="mt-4">
-          <ClassesPanel schools={schools} classes={classes} onChange={refresh} />
-        </TabsContent>
-        <TabsContent value="students" className="mt-4">
-          <StudentsPanel classes={classes} schools={schools} students={students} onChange={refresh} />
-        </TabsContent>
-        <TabsContent value="teachers" className="mt-4">
-          <TeachersPanel teachers={teachers} schools={schools} classes={classes} onChange={refresh} />
-        </TabsContent>
-        <TabsContent value="redemptions" className="mt-4">
-          <RedemptionsPanel teachers={teachers} />
         </TabsContent>
       </Tabs>
     </div>
