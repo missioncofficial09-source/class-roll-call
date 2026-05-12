@@ -255,10 +255,8 @@ function PrincipalPage() {
       </div>
 
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="trend">30-day trend</TabsTrigger>
-          <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="reports">Monthly reports</TabsTrigger>
         </TabsList>
 
@@ -284,55 +282,6 @@ function PrincipalPage() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="trend" className="mt-4">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="font-semibold mb-3">Last 30 days — attendance %</div>
-            <div className="flex items-end gap-1 h-40">
-              {trendByDay.map((d) => (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${d.date} — ${d.pct}%`}>
-                  <div
-                    className={`w-full rounded-t ${d.total ? "bg-primary" : "bg-muted"}`}
-                    style={{ height: `${(d.pct / peakPct) * 100}%`, minHeight: d.total ? 4 : 2 }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-2 tabular-nums">
-              <span>{trendByDay[0]?.date}</span>
-              <span>{trendByDay[trendByDay.length - 1]?.date}</span>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="students" className="mt-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="p-4 border-b border-border font-semibold text-success">Top attendance — this month</div>
-              <ul className="divide-y divide-border">
-                {top5.length === 0 && <li className="p-4 text-sm text-muted-foreground">No data yet.</li>}
-                {top5.map((x) => (
-                  <li key={x.s.id} className="p-3 flex justify-between text-sm">
-                    <span>{x.s.full_name}</span>
-                    <span className="font-semibold tabular-nums">{x.pct}%</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="p-4 border-b border-border font-semibold text-destructive">Needs attention</div>
-              <ul className="divide-y divide-border">
-                {bottom5.length === 0 && <li className="p-4 text-sm text-muted-foreground">No data yet.</li>}
-                {bottom5.map((x) => (
-                  <li key={x.s.id} className="p-3 flex justify-between text-sm">
-                    <span>{x.s.full_name}</span>
-                    <span className="font-semibold tabular-nums">{x.pct}%</span>
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
         </TabsContent>
