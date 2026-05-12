@@ -59,9 +59,6 @@ function LoginPage() {
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
-          <p className="text-sm text-muted-foreground mt-6">
-            No account? <Link to="/signup" className="text-accent font-medium hover:underline">Create one</Link>
-          </p>
         </div>
       </div>
     </div>
