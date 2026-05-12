@@ -2,9 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Users, BookOpen, GraduationCap, CircleDot, TrendingUp, FileBarChart2 } from "lucide-react";
+import { Users, BookOpen, GraduationCap, CircleDot, TrendingUp, FileBarChart2, Lock } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/principal")({
@@ -42,6 +44,30 @@ function PrincipalPage() {
     }
   }, [loading, role, navigate]);
 
+  // ---- Access Code gate (per school, sessionStorage) ----
+  const accessKey = schoolId ? `hazira:principal-access:${schoolId}` : "";
+  const [accessOk, setAccessOk] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [schoolCode, setSchoolCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (!schoolId) return;
+    if (role === "admin") { setAccessOk(true); return; }
+    if (typeof window !== "undefined" && sessionStorage.getItem(accessKey) === "1") {
+      setAccessOk(true);
+    }
+    (async () => {
+      const { data } = await supabase.from("schools").select("code").eq("id", schoolId).maybeSingle();
+      setSchoolCode((data as any)?.code ?? null);
+    })();
+  }, [schoolId, role, accessKey]);
+  const submitAccess = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!schoolCode) { toast.error("No access code set for your school. Ask your admin."); return; }
+    if (accessCode.trim() !== schoolCode) { toast.error("Incorrect access code"); return; }
+    sessionStorage.setItem(accessKey, "1");
+    setAccessOk(true);
+  };
+
   const today = todayKey();
   const monthStart = today.slice(0, 8) + "01";
   const trendStart = shiftDays(today, -29);
@@ -75,7 +101,7 @@ function PrincipalPage() {
   };
 
   useEffect(() => {
-    if (!schoolId || (role !== "principal" && role !== "admin")) return;
+    if (!schoolId || (role !== "principal" && role !== "admin") || !accessOk) return;
     void refresh();
     const channel = supabase
       .channel(`principal-${schoolId}`)
@@ -87,7 +113,7 @@ function PrincipalPage() {
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolId, role]);
+  }, [schoolId, role, accessOk]);
 
   const presentToday = todayRecs.filter((r) => r.status === "present").length;
   const absentToday = todayRecs.filter((r) => r.status === "absent").length;
@@ -188,8 +214,24 @@ function PrincipalPage() {
       </div>
     );
   }
-
-  const peakPct = Math.max(1, ...trendByDay.map((d) => d.pct));
+  if (!accessOk) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16">
+        <form onSubmit={submitAccess} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Lock className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold">Principal access</h1>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            Enter the Access Code provided by your administrator to view {schoolName ?? "your school"}.
+          </p>
+          <Label htmlFor="ac">Access code</Label>
+          <Input id="ac" autoFocus value={accessCode} onChange={(e) => setAccessCode(e.target.value)} className="mt-1.5" />
+          <Button type="submit" className="w-full mt-5">Continue</Button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -213,10 +255,8 @@ function PrincipalPage() {
       </div>
 
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="trend">30-day trend</TabsTrigger>
-          <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="reports">Monthly reports</TabsTrigger>
         </TabsList>
 
@@ -242,55 +282,6 @@ function PrincipalPage() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="trend" className="mt-4">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="font-semibold mb-3">Last 30 days — attendance %</div>
-            <div className="flex items-end gap-1 h-40">
-              {trendByDay.map((d) => (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${d.date} — ${d.pct}%`}>
-                  <div
-                    className={`w-full rounded-t ${d.total ? "bg-primary" : "bg-muted"}`}
-                    style={{ height: `${(d.pct / peakPct) * 100}%`, minHeight: d.total ? 4 : 2 }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-2 tabular-nums">
-              <span>{trendByDay[0]?.date}</span>
-              <span>{trendByDay[trendByDay.length - 1]?.date}</span>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="students" className="mt-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="p-4 border-b border-border font-semibold text-success">Top attendance — this month</div>
-              <ul className="divide-y divide-border">
-                {top5.length === 0 && <li className="p-4 text-sm text-muted-foreground">No data yet.</li>}
-                {top5.map((x) => (
-                  <li key={x.s.id} className="p-3 flex justify-between text-sm">
-                    <span>{x.s.full_name}</span>
-                    <span className="font-semibold tabular-nums">{x.pct}%</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="p-4 border-b border-border font-semibold text-destructive">Needs attention</div>
-              <ul className="divide-y divide-border">
-                {bottom5.length === 0 && <li className="p-4 text-sm text-muted-foreground">No data yet.</li>}
-                {bottom5.map((x) => (
-                  <li key={x.s.id} className="p-3 flex justify-between text-sm">
-                    <span>{x.s.full_name}</span>
-                    <span className="font-semibold tabular-nums">{x.pct}%</span>
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
         </TabsContent>
