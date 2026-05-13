@@ -15,16 +15,18 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { loading, session, role } = useAuth();
+  const { loading, session, role, accessCode } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
     if (loading || !session) return;
+    // Prefer access-code prefix routing (ADM-/PRN-/TCH-), fall back to role.
+    const code = (accessCode ?? "").toUpperCase();
     const dest =
-      role === "admin" ? "/admin" :
-      role === "principal" ? "/principal" :
+      code.startsWith("ADM-") || role === "admin" ? "/admin" :
+      code.startsWith("PRN-") || role === "principal" ? "/principal" :
       "/attendance";
     navigate({ to: dest });
-  }, [loading, session, role, navigate]);
+  }, [loading, session, role, accessCode, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
