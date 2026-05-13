@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import logoDefault from "@/assets/logo.jpeg";
+import { signInWithAccessCode } from "@/lib/code-login.functions";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Hazira" }] }),
@@ -14,18 +16,41 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const codeSignIn = useServerFn(signInWithAccessCode);
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    const upper = trimmed.toUpperCase();
+    if (upper.startsWith("ADM-")) {
+      toast.error("Admin codes use the Admin panel");
+      navigate({ to: "/admin-panel" });
+      return;
+    }
+    if (!upper.startsWith("PRN-") && !upper.startsWith("TCH-")) {
+      toast.error("Code must start with PRN- or TCH-");
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Welcome back");
-    navigate({ to: "/" });
+    try {
+      const { email, tokenHash } = await codeSignIn({ data: { code: trimmed } });
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token_hash: tokenHash,
+        type: "magiclink",
+      });
+      if (error) throw new Error(error.message);
+      toast.success("Welcome back");
+      navigate({ to: "/" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sign in failed";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,19 +70,29 @@ function LoginPage() {
       <div className="flex items-center justify-center p-6 sm:p-10 bg-background">
         <div className="w-full max-w-md">
           <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-          <p className="text-sm text-muted-foreground mt-1">Use the email your admin set up for you.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Enter your access code. Principals start with <span className="font-mono">PRN-</span>, teachers with{" "}
+            <span className="font-mono">TCH-</span>.
+          </p>
           <form onSubmit={submit} className="mt-8 space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5" />
+              <Label htmlFor="code">Access code</Label>
+              <Input
+                id="code"
+                autoFocus
+                required
+                placeholder="PRN-XXXX or TCH-XXXX"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="mt-1.5 font-mono tracking-wide"
+              />
             </div>
             <Button type="submit" disabled={loading} className="w-full h-11 text-base">
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "Signing in…" : "Continue"}
             </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Admin? <Link to="/admin-panel" className="underline">Open admin panel</Link>
+            </p>
           </form>
         </div>
       </div>
