@@ -13,6 +13,7 @@ export interface AuthState {
   fullName: string | null;
   schoolName: string | null;
   schoolLogoUrl: string | null;
+  accessCode: string | null;
   refresh: () => Promise<void>;
 }
 
@@ -23,16 +24,18 @@ export function useAuth(): AuthState {
   const [fullName, setFullName] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState<string | null>(null);
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
+  const [accessCode, setAccessCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (uid: string) => {
     const [{ data: roleRow }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", uid).order("role").maybeSingle(),
-      supabase.from("profiles").select("school_id, full_name").eq("id", uid).maybeSingle(),
+      supabase.from("profiles").select("school_id, full_name, access_code").eq("id", uid).maybeSingle(),
     ]);
     setRole((roleRow?.role as AppRole) ?? null);
     setSchoolId(profile?.school_id ?? null);
     setFullName(profile?.full_name ?? null);
+    setAccessCode((profile as any)?.access_code ?? null);
     if (profile?.school_id) {
       const { data: school } = await supabase
         .from("schools")
@@ -58,6 +61,7 @@ export function useAuth(): AuthState {
         setFullName(null);
         setSchoolName(null);
         setSchoolLogoUrl(null);
+        setAccessCode(null);
       }
     });
     supabase.auth.getSession().then(async ({ data }) => {
@@ -77,6 +81,7 @@ export function useAuth(): AuthState {
     fullName,
     schoolName,
     schoolLogoUrl,
+    accessCode,
     refresh: async () => {
       if (session?.user) await loadProfile(session.user.id);
     },

@@ -172,18 +172,21 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_code: string | null
           created_at: string
           full_name: string | null
           id: string
           school_id: string | null
         }
         Insert: {
+          access_code?: string | null
           created_at?: string
           full_name?: string | null
           id: string
           school_id?: string | null
         }
         Update: {
+          access_code?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
@@ -240,6 +243,7 @@ export type Database = {
           code: string | null
           created_at: string
           id: string
+          is_active: boolean
           logo_url: string | null
           name: string
         }
@@ -247,6 +251,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           logo_url?: string | null
           name: string
         }
@@ -254,6 +259,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           logo_url?: string | null
           name?: string
         }
