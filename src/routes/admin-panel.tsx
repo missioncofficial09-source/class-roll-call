@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
-const MASTER_PASSWORD = "HAZIRA-MASTER-2026";
+const MASTER_PASSWORD = "MissionC@2026";
 const STORAGE_KEY = "hazira:admin-unlocked";
 
 export const Route = createFileRoute("/admin-panel")({
