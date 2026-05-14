@@ -1,13 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ShieldCheck, Building2, LogOut } from "lucide-react";
+import { ShieldCheck, Building2, LogOut, Ban, Trash2, Play, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { listSchools, addSchool, toggleSchool } from "@/lib/admin-schools.functions";
+import { listSchools, addSchool, toggleSchool, deleteSchool } from "@/lib/admin-schools.functions";
 
 const MASTER_PASSWORD = "MissionC2026@gmail.com!";
 const STORAGE_KEY = "hazira:admin-unlocked";
@@ -58,6 +62,7 @@ function AdminDashboard() {
   const fetchSchools = useServerFn(listSchools);
   const createSchool = useServerFn(addSchool);
   const setActive = useServerFn(toggleSchool);
+  const removeSchool = useServerFn(deleteSchool);
 
   const [schools, setSchools] = useState<School[]>([]);
   const [name, setName] = useState("");
@@ -86,13 +91,24 @@ function AdminDashboard() {
     }
   };
 
-  const handleToggle = async (s: School, value: boolean) => {
+  const handleStop = async (s: School) => {
+    const next = !s.is_active;
     try {
-      await setActive({ data: { id: s.id, is_active: value } });
-      setSchools((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: value } : x)));
-      toast.success(value ? "School enabled" : "School disabled");
+      await setActive({ data: { id: s.id, is_active: next } });
+      setSchools((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: next } : x)));
+      toast.success(next ? "School activated" : "School stopped");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to update");
+    }
+  };
+
+  const handleRemove = async (s: School) => {
+    try {
+      await removeSchool({ data: { id: s.id } });
+      setSchools((prev) => prev.filter((x) => x.id !== s.id));
+      toast.success("School removed");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove");
     }
   };
 
@@ -135,14 +151,50 @@ function AdminDashboard() {
               <li className="p-6 text-center text-sm text-muted-foreground">No schools yet.</li>
             )}
             {schools.map((s) => (
-              <li key={s.id} className="p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{s.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {s.code ?? "no code"} · {s.is_active ? "Active" : "Disabled"}
+              <li key={s.id} className="p-4 flex flex-wrap items-center gap-3">
+                <Link
+                  to="/admin-panel/school/$schoolId"
+                  params={{ schoolId: s.id }}
+                  className="flex-1 min-w-0 group"
+                >
+                  <div className="font-medium truncate group-hover:text-primary inline-flex items-center gap-1">
+                    {s.name}
+                    <ChevronRight className="h-4 w-4 opacity-60 group-hover:opacity-100" />
                   </div>
+                  <div className="text-xs text-muted-foreground">
+                    {s.code ?? "no code"} · {s.is_active ? "Active" : "Stopped"}
+                  </div>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={s.is_active ? "secondary" : "default"}
+                    onClick={() => void handleStop(s)}
+                  >
+                    {s.is_active ? <><Ban className="h-4 w-4 mr-1" />Stop</> : <><Play className="h-4 w-4 mr-1" />Resume</>}
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="destructive">
+                        <Trash2 className="h-4 w-4 mr-1" />Remove
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove {s.name}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This permanently deletes the school. Existing classes, students, and attendance records may become orphaned.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => void handleRemove(s)}>
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
-                <Switch checked={s.is_active} onCheckedChange={(v) => void handleToggle(s, v)} aria-label={`Toggle ${s.name}`} />
               </li>
             ))}
           </ul>
