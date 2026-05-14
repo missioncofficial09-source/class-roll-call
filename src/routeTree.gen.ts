@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPrincipalRouteImport } from './routes/_authenticated/principal'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AdminPanelSchoolSchoolIdRouteImport } from './routes/admin-panel.school.$schoolId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -57,35 +58,44 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AdminPanelSchoolSchoolIdRoute =
+  AdminPanelSchoolSchoolIdRouteImport.update({
+    id: '/school/$schoolId',
+    path: '/school/$schoolId',
+    getParentRoute: () => AdminPanelRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin-panel': typeof AdminPanelRoute
+  '/admin-panel': typeof AdminPanelRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/principal': typeof AuthenticatedPrincipalRoute
+  '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin-panel': typeof AdminPanelRoute
+  '/admin-panel': typeof AdminPanelRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/principal': typeof AuthenticatedPrincipalRoute
+  '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/admin-panel': typeof AdminPanelRoute
+  '/admin-panel': typeof AdminPanelRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/principal': typeof AuthenticatedPrincipalRoute
+  '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/attendance'
     | '/principal'
+    | '/admin-panel/school/$schoolId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/attendance'
     | '/principal'
+    | '/admin-panel/school/$schoolId'
   id:
     | '__root__'
     | '/'
@@ -116,12 +128,13 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/attendance'
     | '/_authenticated/principal'
+    | '/admin-panel/school/$schoolId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  AdminPanelRoute: typeof AdminPanelRoute
+  AdminPanelRoute: typeof AdminPanelRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
 }
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/admin-panel/school/$schoolId': {
+      id: '/admin-panel/school/$schoolId'
+      path: '/school/$schoolId'
+      fullPath: '/admin-panel/school/$schoolId'
+      preLoaderRoute: typeof AdminPanelSchoolSchoolIdRouteImport
+      parentRoute: typeof AdminPanelRoute
+    }
   }
 }
 
@@ -203,13 +223,35 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface AdminPanelRouteChildren {
+  AdminPanelSchoolSchoolIdRoute: typeof AdminPanelSchoolSchoolIdRoute
+}
+
+const AdminPanelRouteChildren: AdminPanelRouteChildren = {
+  AdminPanelSchoolSchoolIdRoute: AdminPanelSchoolSchoolIdRoute,
+}
+
+const AdminPanelRouteWithChildren = AdminPanelRoute._addFileChildren(
+  AdminPanelRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  AdminPanelRoute: AdminPanelRoute,
+  AdminPanelRoute: AdminPanelRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
