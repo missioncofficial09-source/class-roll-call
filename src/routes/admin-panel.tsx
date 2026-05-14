@@ -4,10 +4,9 @@ import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
-const MASTER_PASSWORD = "MissionC@2026";
+const MASTER_PASSWORD = "MissionC2026@gmail.com!";
 const STORAGE_KEY = "hazira:admin-unlocked";
 
 export const Route = createFileRoute("/admin-panel")({
@@ -17,32 +16,19 @@ export const Route = createFileRoute("/admin-panel")({
 
 function AdminPanelGate() {
   const navigate = useNavigate();
-  const { loading, session, role } = useAuth();
   const [pw, setPw] = useState("");
-  const [unlocked, setUnlocked] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && sessionStorage.getItem(STORAGE_KEY) === "1") {
-      setUnlocked(true);
+      navigate({ to: "/admin" });
     }
-  }, []);
-
-  useEffect(() => {
-    if (!unlocked || loading) return;
-    if (!session) navigate({ to: "/login" });
-    else if (role === "admin") navigate({ to: "/admin" });
-    else toast.error("This account is not an administrator");
-  }, [unlocked, loading, session, role, navigate]);
-
-  if (unlocked) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Verifying…</div>;
-  }
+  }, [navigate]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (pw !== MASTER_PASSWORD) { toast.error("Incorrect master password"); return; }
     sessionStorage.setItem(STORAGE_KEY, "1");
-    setUnlocked(true);
+    navigate({ to: "/admin" });
   };
 
   return (
