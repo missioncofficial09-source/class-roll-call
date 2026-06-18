@@ -27,11 +27,18 @@ export const signInWithAccessCode = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Look up the code in the schools table (case-insensitive, dashed or bare)
+    // Resolve to the school. Each school is identified by its PRN-<suffix> code.
+    // A TCH-<suffix> code maps to the SAME school as PRN-<suffix> so teachers
+    // inherit the principal's school_id automatically.
+    const suffix = variants.dashed.split("-")[1] ?? "";
+    const principalDashed = `PRN-${suffix}`;
+    const principalBare = `PRN${suffix}`;
     const { data: school, error: sErr } = await supabaseAdmin
       .from("schools")
       .select("id, name, code, is_active")
-      .or(`code.ilike.${variants.dashed},code.ilike.${variants.bare}`)
+      .or(
+        `code.ilike.${principalDashed},code.ilike.${principalBare},code.ilike.${variants.dashed},code.ilike.${variants.bare}`,
+      )
       .maybeSingle();
     if (sErr) throw new Response(sErr.message, { status: 500 });
     if (!school) throw new Response("Access code not found", { status: 401 });
