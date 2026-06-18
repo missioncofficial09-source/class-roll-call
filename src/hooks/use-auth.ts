@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
+import { loadCodeSession, clearCodeSession, type CodeSession } from "@/lib/code-session";
 
 export type AppRole = "admin" | "principal" | "teacher";
 
@@ -14,6 +15,9 @@ export interface AuthState {
   schoolName: string | null;
   schoolLogoUrl: string | null;
   accessCode: string | null;
+  isAuthed: boolean;
+  codeSession: CodeSession | null;
+  signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -26,6 +30,7 @@ export function useAuth(): AuthState {
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [codeSession, setCodeSession] = useState<CodeSession | null>(null);
 
   const loadProfile = async (uid: string) => {
     const [{ data: roleRow }, { data: profile }] = await Promise.all([
@@ -69,21 +74,46 @@ export function useAuth(): AuthState {
       if (data.session?.user) await loadProfile(data.session.user.id);
       setLoading(false);
     });
-    return () => sub.subscription.unsubscribe();
+    // Code-based (localStorage) session
+    const syncCode = () => setCodeSession(loadCodeSession());
+    syncCode();
+    window.addEventListener("hazira:code-session", syncCode);
+    window.addEventListener("storage", syncCode);
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("hazira:code-session", syncCode);
+      window.removeEventListener("storage", syncCode);
+    };
   }, []);
+
+  // Code session overrides when no supabase session
+  const effRole = (session ? role : codeSession?.role) ?? null;
+  const effSchoolId = (session ? schoolId : codeSession?.schoolId) ?? null;
+  const effSchoolName = (session ? schoolName : codeSession?.schoolName) ?? null;
+  const effAccessCode = (session ? accessCode : codeSession?.code) ?? null;
+  const effFullName = (session ? fullName : codeSession ? `${codeSession.role === "principal" ? "Principal" : "Teacher"}` : null);
+  const isAuthed = !!session || !!codeSession;
 
   return {
     loading,
     session,
     user: session?.user ?? null,
-    role,
-    schoolId,
-    fullName,
-    schoolName,
+    role: effRole,
+    schoolId: effSchoolId,
+    fullName: effFullName,
+    schoolName: effSchoolName,
     schoolLogoUrl,
-    accessCode,
+    accessCode: effAccessCode,
+    isAuthed,
+    codeSession,
+    signOut: async () => {
+      clearCodeSession();
+      setCodeSession(null);
+      if (session) await supabase.auth.signOut();
+    },
     refresh: async () => {
       if (session?.user) await loadProfile(session.user.id);
+      setCodeSession(loadCodeSession());
     },
   };
 }

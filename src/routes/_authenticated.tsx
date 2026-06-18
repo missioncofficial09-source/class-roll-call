@@ -8,14 +8,14 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { loading, session, role, fullName, schoolName, schoolLogoUrl } = useAuth();
+  const { loading, isAuthed, role, fullName, schoolName, schoolLogoUrl } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !session) navigate({ to: "/login" });
-  }, [loading, session, navigate]);
+    if (!loading && !isAuthed) navigate({ to: "/login" });
+  }, [loading, isAuthed, navigate]);
 
-  if (loading || !session) {
+  if (loading || !isAuthed) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   }
 

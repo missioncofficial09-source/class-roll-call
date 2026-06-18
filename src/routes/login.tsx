@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import logoDefault from "@/assets/logo.jpeg";
 import { signInWithAccessCode } from "@/lib/code-login.functions";
+import { saveCodeSession } from "@/lib/code-session";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Hazira" }] }),
@@ -30,21 +30,17 @@ function LoginPage() {
       navigate({ to: "/admin-panel" });
       return;
     }
-    if (!upper.startsWith("PRN-") && !upper.startsWith("TCH-")) {
+    const cleaned = upper.replace(/[\s-]+/g, "");
+    if (!cleaned.startsWith("PRN") && !cleaned.startsWith("TCH")) {
       toast.error("Code must start with PRN- or TCH-");
       return;
     }
     setLoading(true);
     try {
-      const { email, tokenHash } = await codeSignIn({ data: { code: trimmed } });
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token_hash: tokenHash,
-        type: "magiclink",
-      });
-      if (error) throw new Error(error.message);
-      toast.success("Welcome back");
-      navigate({ to: "/" });
+      const result = await codeSignIn({ data: { code: trimmed } });
+      saveCodeSession(result);
+      toast.success(`Welcome — ${result.schoolName ?? "school"}`);
+      navigate({ to: result.role === "principal" ? "/principal" : "/attendance" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sign in failed";
       toast.error(msg);
