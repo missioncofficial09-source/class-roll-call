@@ -97,6 +97,7 @@ function AttendancePage() {
         }
         return;
       }
+      if (!user) return;
       let q = supabase.from("classes").select("id, name, grade, school_id, whatsapp_group_name, school:schools(name)").order("name");
       if (role === "teacher") {
         const { data: tc } = await supabase.from("teacher_classes").select("class_id").eq("teacher_id", user.id);
