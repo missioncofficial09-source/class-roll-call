@@ -15,10 +15,10 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { loading, session, role, accessCode } = useAuth();
+  const { loading, isAuthed, role, accessCode } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (loading || !session) return;
+    if (loading || !isAuthed) return;
     // Prefer access-code prefix routing (ADM-/PRN-/TCH-), fall back to role.
     const code = (accessCode ?? "").toUpperCase();
     const dest =
@@ -26,7 +26,7 @@ function Index() {
       code.startsWith("PRN-") || role === "principal" ? "/principal" :
       "/attendance";
     navigate({ to: dest });
-  }, [loading, session, role, accessCode, navigate]);
+  }, [loading, isAuthed, role, accessCode, navigate]);
 
   const tiles = [
     {
