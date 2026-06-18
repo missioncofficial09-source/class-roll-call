@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
 import { extractNamesFromImage } from "@/lib/extract-names.functions";
 import { WalletCard } from "@/components/WalletCard";
+import {
+  listTeacherClasses,
+  listClassStudents,
+  listClassAttendance,
+  saveClassAttendance,
+  addClassStudents,
+} from "@/lib/teacher-data.functions";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   head: () => ({ meta: [{ title: "Mark attendance — Hazira" }] }),
@@ -35,7 +42,14 @@ const shiftDateKey = (dateKey: string, days: number) => {
 };
 
 function AttendancePage() {
-  const { user, role } = useAuth();
+  const { user, role, codeSession, schoolName } = useAuth();
+  const code = codeSession?.code ?? null;
+  const isCodeTeacher = !!codeSession && codeSession.role === "teacher";
+  const fnListClasses = useServerFn(listTeacherClasses);
+  const fnListStudents = useServerFn(listClassStudents);
+  const fnListAttendance = useServerFn(listClassAttendance);
+  const fnSaveAttendance = useServerFn(saveClassAttendance);
+  const fnAddStudents = useServerFn(addClassStudents);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [classId, setClassId] = useState<string>("");
   const [students, setStudents] = useState<Student[]>([]);
@@ -65,8 +79,25 @@ function AttendancePage() {
 
   // Load assigned classes (teachers) or all classes (admin)
   useEffect(() => {
-    if (!user) return;
+    if (!user && !isCodeTeacher) return;
     (async () => {
+      // Code-session teachers: strict school_id filter via server function.
+      if (isCodeTeacher && code) {
+        try {
+          const res = await fnListClasses({ data: { code } });
+          const rows = (res.classes ?? []).map((c: any) => ({
+            id: c.id, name: c.name, grade: c.grade, school_id: c.school_id,
+            whatsapp_group_name: c.whatsapp_group_name,
+            school: schoolName ? { name: schoolName } : null,
+          })) as ClassRow[];
+          setClasses(rows);
+          if (rows.length > 0 && !classId) setClassId(rows[0].id);
+        } catch (e: any) {
+          toast.error(e?.message ?? "Could not load classes");
+        }
+        return;
+      }
+      if (!user) return;
       let q = supabase.from("classes").select("id, name, grade, school_id, whatsapp_group_name, school:schools(name)").order("name");
       if (role === "teacher") {
         const { data: tc } = await supabase.from("teacher_classes").select("class_id").eq("teacher_id", user.id);
@@ -79,7 +110,7 @@ function AttendancePage() {
       setClasses((data as ClassRow[]) ?? []);
       if (data && data.length > 0 && !classId) setClassId(data[0].id);
     })();
-  }, [user, role]);
+  }, [user, role, isCodeTeacher, code]);
 
   // Load students + today's existing attendance
   useEffect(() => {
@@ -87,20 +118,37 @@ function AttendancePage() {
     setLoadingStudents(true);
     const weekStart = shiftDateKey(today, -6);
     (async () => {
-      const [{ data: s, error: e1 }, { data: a }, { data: weekly }] = await Promise.all([
-        supabase.from("students").select("id, full_name, roll_number").eq("class_id", classId).order("roll_number", { nullsFirst: false }).order("full_name"),
-        supabase.from("attendance_records").select("student_id, status").eq("class_id", classId).eq("date", today),
-        supabase.from("attendance_records").select("student_id, status, date").eq("class_id", classId).gte("date", weekStart).lte("date", today),
-      ]);
-      setLoadingStudents(false);
-      if (e1) return toast.error(e1.message);
-      setStudents((s as Student[]) ?? []);
-      setWeeklyRecords((weekly as WeeklyRecord[]) ?? []);
-      const m: Record<string, Status> = {};
-      (a ?? []).forEach((r: any) => { m[r.student_id] = r.status; });
-      setMarks(m);
+      try {
+        if (isCodeTeacher && code) {
+          const [s, weekly] = await Promise.all([
+            fnListStudents({ data: { code, classId } }),
+            fnListAttendance({ data: { code, classId, fromDate: weekStart, toDate: today } }),
+          ]);
+          setStudents((s as Student[]) ?? []);
+          setWeeklyRecords((weekly as WeeklyRecord[]) ?? []);
+          const m: Record<string, Status> = {};
+          (weekly ?? []).forEach((r: any) => { if (r.date === today) m[r.student_id] = r.status; });
+          setMarks(m);
+        } else {
+          const [{ data: s, error: e1 }, { data: a }, { data: weekly }] = await Promise.all([
+            supabase.from("students").select("id, full_name, roll_number").eq("class_id", classId).order("roll_number", { nullsFirst: false }).order("full_name"),
+            supabase.from("attendance_records").select("student_id, status").eq("class_id", classId).eq("date", today),
+            supabase.from("attendance_records").select("student_id, status, date").eq("class_id", classId).gte("date", weekStart).lte("date", today),
+          ]);
+          if (e1) throw e1;
+          setStudents((s as Student[]) ?? []);
+          setWeeklyRecords((weekly as WeeklyRecord[]) ?? []);
+          const m: Record<string, Status> = {};
+          (a ?? []).forEach((r: any) => { m[r.student_id] = r.status; });
+          setMarks(m);
+        }
+      } catch (err: any) {
+        toast.error(err?.message ?? "Could not load class data");
+      } finally {
+        setLoadingStudents(false);
+      }
     })();
-  }, [classId, today]);
+  }, [classId, today, isCodeTeacher, code]);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const presentCount = useMemo(() => Object.values(marks).filter((s) => s === "present").length, [marks]);
@@ -115,23 +163,40 @@ function AttendancePage() {
   };
 
   const save = async () => {
-    if (!cls || !user) return;
+    if (!cls) return;
     const rows = students
       .filter((s) => marks[s.id])
       .map((s) => ({
         student_id: s.id,
         class_id: cls.id,
         school_id: cls.school_id,
-        recorded_by: user.id,
+        recorded_by: user?.id ?? null,
         date: today,
         status: marks[s.id],
       }));
     if (rows.length === 0) { toast.error("Mark at least one student"); return; }
     setSaving(true);
-    const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "student_id,date" });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Saved ${rows.length} records`);
+    try {
+      if (isCodeTeacher && code) {
+        const res = await fnSaveAttendance({
+          data: {
+            code,
+            classId: cls.id,
+            date: today,
+            marks: rows.map((r) => ({ student_id: r.student_id, status: r.status as Status })),
+          },
+        });
+        toast.success(`Saved ${res.saved} records`);
+      } else {
+        const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "student_id,date" });
+        if (error) throw error;
+        toast.success(`Saved ${rows.length} records`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not save");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Build the wa.me URL from current state — used as a direct <a href>
@@ -273,18 +338,29 @@ function AttendancePage() {
     const existing = new Set(students.map((s) => s.full_name.toLowerCase()));
     const fresh = cleaned.filter((n) => !existing.has(n.toLowerCase()));
     if (fresh.length === 0) { toast.info("All names already in this class"); setImportOpen(false); return; }
-    const startRoll = (students.reduce((m, s) => Math.max(m, s.roll_number ?? 0), 0)) + 1;
-    const rows = fresh.map((full_name, i) => ({ class_id: classId, full_name, roll_number: startRoll + i }));
     setImporting(true);
-    const { error } = await supabase.from("students").insert(rows);
-    setImporting(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Added ${rows.length} student${rows.length === 1 ? "" : "s"}`);
-    setImportOpen(false);
-    setImportNames([]);
-    // Reload students
-    const { data: s } = await supabase.from("students").select("id, full_name, roll_number").eq("class_id", classId).order("roll_number", { nullsFirst: false }).order("full_name");
-    setStudents((s as Student[]) ?? []);
+    try {
+      if (isCodeTeacher && code) {
+        const res = await fnAddStudents({ data: { code, classId, names: fresh } });
+        toast.success(`Added ${res.added} student${res.added === 1 ? "" : "s"}`);
+        const s = await fnListStudents({ data: { code, classId } });
+        setStudents((s as Student[]) ?? []);
+      } else {
+        const startRoll = (students.reduce((m, s) => Math.max(m, s.roll_number ?? 0), 0)) + 1;
+        const rows = fresh.map((full_name, i) => ({ class_id: classId, full_name, roll_number: startRoll + i }));
+        const { error } = await supabase.from("students").insert(rows);
+        if (error) throw error;
+        toast.success(`Added ${rows.length} student${rows.length === 1 ? "" : "s"}`);
+        const { data: s } = await supabase.from("students").select("id, full_name, roll_number").eq("class_id", classId).order("roll_number", { nullsFirst: false }).order("full_name");
+        setStudents((s as Student[]) ?? []);
+      }
+      setImportOpen(false);
+      setImportNames([]);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not add students");
+    } finally {
+      setImporting(false);
+    }
   };
 
   if (classes.length === 0) {
