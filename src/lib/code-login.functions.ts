@@ -27,6 +27,35 @@ export const signInWithAccessCode = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Teacher codes: look up in school_teachers (principal-issued profiles).
+    if (variants.prefix === "TCH") {
+      const { data: teacher, error: tErr } = await supabaseAdmin
+        .from("school_teachers")
+        .select("id, full_name, code, class_id, school_id, is_active, schools(name, is_active)")
+        .or(`code.ilike.${variants.dashed},code.ilike.${variants.bare}`)
+        .maybeSingle();
+      if (tErr) throw new Response(tErr.message, { status: 500 });
+      if (teacher) {
+        if (teacher.is_active === false) {
+          throw new Response("This teacher account is disabled.", { status: 403 });
+        }
+        const sch = (teacher as any).schools;
+        if (sch?.is_active === false) {
+          throw new Response("This school is disabled. Contact your admin.", { status: 403 });
+        }
+        return {
+          schoolId: teacher.school_id as string,
+          schoolName: (sch?.name as string) ?? null,
+          code: (teacher.code as string) ?? variants.dashed,
+          role: "teacher" as const,
+          teacherId: teacher.id as string,
+          teacherName: (teacher.full_name as string) ?? null,
+          classId: (teacher.class_id as string) ?? null,
+        };
+      }
+      // Fall through to legacy PRN-suffix mapping if no principal-issued teacher matches.
+    }
+
     // Resolve to the school. Each school is identified by its PRN-<suffix> code.
     // A TCH-<suffix> code maps to the SAME school as PRN-<suffix> so teachers
     // inherit the principal's school_id automatically.
@@ -52,5 +81,8 @@ export const signInWithAccessCode = createServerFn({ method: "POST" })
       schoolName: (school.name as string) ?? null,
       code: (school.code as string) ?? variants.dashed,
       role,
+      teacherId: null as string | null,
+      teacherName: null as string | null,
+      classId: null as string | null,
     };
   });

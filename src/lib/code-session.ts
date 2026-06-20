@@ -3,6 +3,9 @@ export type CodeSession = {
   schoolName: string | null;
   code: string;
   role: "principal" | "teacher";
+  teacherId?: string | null;
+  teacherName?: string | null;
+  classId?: string | null;
 };
 
 const KEY = "hazira_code_session";
