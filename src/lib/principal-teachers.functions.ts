@@ -106,7 +106,12 @@ export const updateSchoolTeacher = createServerFn({ method: "POST" })
       if (!cls || cls.school_id !== schoolId)
         throw new Response("Class does not belong to your school", { status: 403 });
     }
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const patch: {
+      updated_at: string;
+      class_id?: string | null;
+      full_name?: string;
+      is_active?: boolean;
+    } = { updated_at: new Date().toISOString() };
     if (data.classId !== undefined) patch.class_id = data.classId;
     if (data.fullName !== undefined) patch.full_name = data.fullName;
     if (data.isActive !== undefined) patch.is_active = data.isActive;
