@@ -238,6 +238,54 @@ export type Database = {
         }
         Relationships: []
       }
+      school_teachers: {
+        Row: {
+          class_id: string | null
+          code: string
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_id?: string | null
+          code: string
+          created_at?: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string | null
+          code?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_teachers_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_teachers_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           code: string | null
