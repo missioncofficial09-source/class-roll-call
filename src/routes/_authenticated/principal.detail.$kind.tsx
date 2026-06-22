@@ -44,19 +44,22 @@ function PrincipalDetailPage() {
     if (!schoolId || !isValid) return;
     setFetching(true);
     (async () => {
-      const { data: c } = await supabase
-        .from("classes").select("id, name, grade").eq("school_id", schoolId).order("name");
-      const cls = (c as ClassRow[]) ?? [];
-      setClasses(cls);
-      const ids = cls.map((x) => x.id);
-      if (ids.length === 0) { setStudents([]); setAttn([]); setFetching(false); return; }
-      const [{ data: s }, { data: a }] = await Promise.all([
-        supabase.from("students").select("id, full_name, roll_number, class_id").in("class_id", ids).order("full_name"),
-        supabase.from("attendance_records").select("student_id, class_id, status").eq("school_id", schoolId).eq("date", today),
-      ]);
-      setStudents((s as StudentRow[]) ?? []);
-      setAttn((a as AttnRow[]) ?? []);
-      setFetching(false);
+      try {
+        const { data: c } = await supabase
+          .from("classes").select("id, name, grade").eq("school_id", schoolId).order("name");
+        const cls = Array.isArray(c) ? (c as ClassRow[]) : [];
+        setClasses(cls);
+        const ids = cls.map((x) => x.id);
+        if (ids.length === 0) { setStudents([]); setAttn([]); return; }
+        const [s, a] = await Promise.all([
+          supabase.from("students").select("id, full_name, roll_number, class_id").in("class_id", ids).order("full_name"),
+          supabase.from("attendance_records").select("student_id, class_id, status").eq("school_id", schoolId).eq("date", today),
+        ]);
+        setStudents(Array.isArray(s.data) ? (s.data as StudentRow[]) : []);
+        setAttn(Array.isArray(a.data) ? (a.data as AttnRow[]) : []);
+      } finally {
+        setFetching(false);
+      }
     })();
   }, [schoolId, isValid, today]);
 
