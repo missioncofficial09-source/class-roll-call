@@ -18,6 +18,7 @@ import { Route as AuthenticatedPrincipalRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AdminPanelSchoolSchoolIdRouteImport } from './routes/admin-panel.school.$schoolId'
+import { Route as AuthenticatedPrincipalDetailKindRouteImport } from './routes/_authenticated/principal.detail.$kind'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -64,6 +65,12 @@ const AdminPanelSchoolSchoolIdRoute =
     path: '/school/$schoolId',
     getParentRoute: () => AdminPanelRoute,
   } as any)
+const AuthenticatedPrincipalDetailKindRoute =
+  AuthenticatedPrincipalDetailKindRouteImport.update({
+    id: '/detail/$kind',
+    path: '/detail/$kind',
+    getParentRoute: () => AuthenticatedPrincipalRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -72,8 +79,9 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
-  '/principal': typeof AuthenticatedPrincipalRoute
+  '/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
+  '/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -82,8 +90,9 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
-  '/principal': typeof AuthenticatedPrincipalRoute
+  '/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
+  '/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -94,8 +103,9 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
-  '/_authenticated/principal': typeof AuthenticatedPrincipalRoute
+  '/_authenticated/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
+  '/_authenticated/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/principal'
     | '/admin-panel/school/$schoolId'
+    | '/principal/detail/$kind'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/principal'
     | '/admin-panel/school/$schoolId'
+    | '/principal/detail/$kind'
   id:
     | '__root__'
     | '/'
@@ -129,6 +141,7 @@ export interface FileRouteTypes {
     | '/_authenticated/attendance'
     | '/_authenticated/principal'
     | '/admin-panel/school/$schoolId'
+    | '/_authenticated/principal/detail/$kind'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -204,19 +217,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPanelSchoolSchoolIdRouteImport
       parentRoute: typeof AdminPanelRoute
     }
+    '/_authenticated/principal/detail/$kind': {
+      id: '/_authenticated/principal/detail/$kind'
+      path: '/detail/$kind'
+      fullPath: '/principal/detail/$kind'
+      preLoaderRoute: typeof AuthenticatedPrincipalDetailKindRouteImport
+      parentRoute: typeof AuthenticatedPrincipalRoute
+    }
   }
 }
+
+interface AuthenticatedPrincipalRouteChildren {
+  AuthenticatedPrincipalDetailKindRoute: typeof AuthenticatedPrincipalDetailKindRoute
+}
+
+const AuthenticatedPrincipalRouteChildren: AuthenticatedPrincipalRouteChildren =
+  {
+    AuthenticatedPrincipalDetailKindRoute:
+      AuthenticatedPrincipalDetailKindRoute,
+  }
+
+const AuthenticatedPrincipalRouteWithChildren =
+  AuthenticatedPrincipalRoute._addFileChildren(
+    AuthenticatedPrincipalRouteChildren,
+  )
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
-  AuthenticatedPrincipalRoute: typeof AuthenticatedPrincipalRoute
+  AuthenticatedPrincipalRoute: typeof AuthenticatedPrincipalRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
-  AuthenticatedPrincipalRoute: AuthenticatedPrincipalRoute,
+  AuthenticatedPrincipalRoute: AuthenticatedPrincipalRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
