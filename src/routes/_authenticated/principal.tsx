@@ -1,14 +1,13 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Users, BookOpen, GraduationCap, CircleDot, UserPlus, Trash2, Copy } from "lucide-react";
+import { Users, BookOpen, GraduationCap, CircleDot, UserPlus, Trash2, Copy, ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   listSchoolTeachers,
@@ -102,10 +101,10 @@ function PrincipalPage() {
 
         <TabsContent value="overview" className="mt-0">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <Stat label="Classes" value={classes.length} icon={BookOpen} />
-        <Stat label="Students" value={students.length} icon={Users} />
-        <Stat label="Present today" value={present} tone="success" icon={GraduationCap} />
-        <Stat label="Absent today" value={absent} tone="destructive" icon={GraduationCap} />
+        <StatLink to="classes" label="Classes" value={classes.length} icon={BookOpen} />
+        <StatLink to="students" label="Students" value={students.length} icon={Users} />
+        <StatLink to="present" label="Present today" value={present} tone="success" icon={GraduationCap} />
+        <StatLink to="absent" label="Absent today" value={absent} tone="destructive" icon={GraduationCap} />
           </div>
 
           <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -140,16 +139,23 @@ function PrincipalPage() {
   );
 }
 
-function Stat({ label, value, tone, icon: Icon }: { label: string; value: number; tone?: "success" | "destructive"; icon: any }) {
+function StatLink({ to, label, value, tone, icon: Icon }: { to: "classes" | "students" | "present" | "absent"; label: string; value: number; tone?: "success" | "destructive"; icon: any }) {
   const colors = tone === "success" ? "text-success" : tone === "destructive" ? "text-destructive" : "text-primary";
   return (
-    <div className="rounded-2xl border border-border p-4 bg-card">
+    <Link
+      to="/principal/detail/$kind"
+      params={{ kind: to }}
+      className="rounded-2xl border border-border p-4 bg-card hover:bg-muted/40 transition-colors group focus:outline-none focus:ring-2 focus:ring-ring"
+    >
       <div className="flex items-center justify-between">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
         <Icon className={`h-4 w-4 ${colors}`} />
       </div>
-      <div className={`text-3xl font-bold mt-2 tabular-nums ${colors}`}>{value}</div>
-    </div>
+      <div className="flex items-end justify-between mt-2">
+        <div className={`text-3xl font-bold tabular-nums ${colors}`}>{value}</div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+    </Link>
   );
 }
 
@@ -162,7 +168,7 @@ type TeacherRow = {
   classes?: { name: string; grade: string | null } | null;
 };
 
-function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode: string | null }) {
+function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; accessCode: string | null }) {
   const list = useServerFn(listSchoolTeachers);
   const create = useServerFn(createSchoolTeacher);
   const update = useServerFn(updateSchoolTeacher);
@@ -171,7 +177,7 @@ function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode:
   const [teachers, setTeachers] = useState<TeacherRow[]>([]);
   const [fullName, setFullName] = useState("");
   const [codeSuffix, setCodeSuffix] = useState("");
-  const [classId, setClassId] = useState<string>("__none__");
+  const [className, setClassName] = useState("");
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
@@ -200,13 +206,13 @@ function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode:
           code: accessCode,
           fullName: fullName.trim(),
           teacherCode: codeSuffix.trim(),
-          classId: classId === "__none__" ? null : classId,
+          className: className.trim() || null,
         },
       });
       toast.success("Teacher created");
       setFullName("");
       setCodeSuffix("");
-      setClassId("__none__");
+      setClassName("");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create teacher");
@@ -219,8 +225,9 @@ function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode:
     if (!accessCode) return;
     try {
       await update({
-        data: { code: accessCode, teacherId, classId: value === "__none__" ? null : value },
+        data: { code: accessCode, teacherId, className: value.trim() || null },
       });
+      toast.success("Class updated");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed");
@@ -264,16 +271,14 @@ function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode:
             </div>
           </div>
           <div>
-            <Label>Assign class</Label>
-            <Select value={classId} onValueChange={setClassId}>
-              <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select class" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Unassigned</SelectItem>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}{c.grade ? ` · ${c.grade}` : ""}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="t-class">Class</Label>
+            <Input
+              id="t-class"
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+              placeholder="e.g. 8th A"
+              className="mt-1.5"
+            />
           </div>
         </div>
         <div className="mt-4 flex justify-end">
@@ -295,17 +300,10 @@ function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode:
                   {t.code} <Copy className="h-3 w-3" />
                 </button>
               </div>
-              <div className="w-full sm:w-56">
-                <Select value={t.class_id ?? "__none__"} onValueChange={(v) => onAssign(t.id, v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Unassigned</SelectItem>
-                    {classes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}{c.grade ? ` · ${c.grade}` : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <ClassNameInput
+                initial={t.classes?.name ?? ""}
+                onSave={(v) => onAssign(t.id, v)}
+              />
               <Button variant="ghost" size="icon" onClick={() => onDelete(t.id)} aria-label="Remove teacher">
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
@@ -314,5 +312,24 @@ function TeachersTab({ classes, accessCode }: { classes: ClassRow[]; accessCode:
         </ul>
       </div>
     </div>
+  );
+}
+
+function ClassNameInput({ initial, onSave }: { initial: string; onSave: (v: string) => void | Promise<void> }) {
+  const [value, setValue] = useState(initial);
+  useEffect(() => { setValue(initial); }, [initial]);
+  const commit = () => {
+    if ((value.trim() || "") === (initial.trim() || "")) return;
+    void onSave(value);
+  };
+  return (
+    <Input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      placeholder="e.g. 8th A"
+      className="w-full sm:w-56"
+    />
   );
 }

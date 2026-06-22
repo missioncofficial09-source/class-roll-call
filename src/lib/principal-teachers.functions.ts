@@ -29,6 +29,28 @@ function normalizeTeacherCode(raw: string): { dashed: string; bare: string; suff
 
 const CodeOnly = z.object({ code: z.string().trim().min(3).max(64) });
 
+// Find an existing class in this school by case-insensitive name, or create one.
+async function resolveClassByName(schoolId: string, rawName: string): Promise<string> {
+  const name = rawName.trim();
+  if (!name) throw new Response("Class name required", { status: 400 });
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: existing, error: findErr } = await supabaseAdmin
+    .from("classes")
+    .select("id")
+    .eq("school_id", schoolId)
+    .ilike("name", name)
+    .maybeSingle();
+  if (findErr) throw new Response(findErr.message, { status: 500 });
+  if (existing) return existing.id as string;
+  const { data: inserted, error: insErr } = await supabaseAdmin
+    .from("classes")
+    .insert({ school_id: schoolId, name })
+    .select("id")
+    .single();
+  if (insErr) throw new Response(insErr.message, { status: 500 });
+  return inserted.id as string;
+}
+
 export const listSchoolTeachers = createServerFn({ method: "POST" })
   .inputValidator((d) => CodeOnly.parse(d))
   .handler(async ({ data }) => {
@@ -46,7 +68,7 @@ export const listSchoolTeachers = createServerFn({ method: "POST" })
 const CreateTeacher = CodeOnly.extend({
   fullName: z.string().trim().min(2).max(120),
   teacherCode: z.string().trim().min(1).max(32),
-  classId: z.string().uuid().nullable().optional(),
+  className: z.string().trim().max(120).nullable().optional(),
 });
 
 export const createSchoolTeacher = createServerFn({ method: "POST" })
@@ -55,13 +77,9 @@ export const createSchoolTeacher = createServerFn({ method: "POST" })
     const schoolId = await resolvePrincipalSchool(data.code);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    if (data.classId) {
-      const { data: cls, error: cErr } = await supabaseAdmin
-        .from("classes").select("id, school_id").eq("id", data.classId).maybeSingle();
-      if (cErr) throw new Response(cErr.message, { status: 500 });
-      if (!cls || cls.school_id !== schoolId)
-        throw new Response("Class does not belong to your school", { status: 403 });
-    }
+    const classId = data.className && data.className.trim()
+      ? await resolveClassByName(schoolId, data.className)
+      : null;
 
     const { dashed, bare } = normalizeTeacherCode(data.teacherCode);
 
@@ -78,7 +96,7 @@ export const createSchoolTeacher = createServerFn({ method: "POST" })
       .from("school_teachers")
       .insert({
         school_id: schoolId,
-        class_id: data.classId ?? null,
+        class_id: classId,
         full_name: data.fullName,
         code: dashed,
       })
@@ -90,7 +108,7 @@ export const createSchoolTeacher = createServerFn({ method: "POST" })
 
 const UpdateTeacher = CodeOnly.extend({
   teacherId: z.string().uuid(),
-  classId: z.string().uuid().nullable().optional(),
+  className: z.string().trim().max(120).nullable().optional(),
   fullName: z.string().trim().min(2).max(120).optional(),
   isActive: z.boolean().optional(),
 });
@@ -100,19 +118,17 @@ export const updateSchoolTeacher = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const schoolId = await resolvePrincipalSchool(data.code);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (data.classId) {
-      const { data: cls } = await supabaseAdmin
-        .from("classes").select("id, school_id").eq("id", data.classId).maybeSingle();
-      if (!cls || cls.school_id !== schoolId)
-        throw new Response("Class does not belong to your school", { status: 403 });
-    }
     const patch: {
       updated_at: string;
       class_id?: string | null;
       full_name?: string;
       is_active?: boolean;
     } = { updated_at: new Date().toISOString() };
-    if (data.classId !== undefined) patch.class_id = data.classId;
+    if (data.className !== undefined) {
+      patch.class_id = data.className && data.className.trim()
+        ? await resolveClassByName(schoolId, data.className)
+        : null;
+    }
     if (data.fullName !== undefined) patch.full_name = data.fullName;
     if (data.isActive !== undefined) patch.is_active = data.isActive;
     const { error } = await supabaseAdmin
