@@ -42,21 +42,24 @@ function PrincipalPage() {
 
   const refresh = async () => {
     if (!schoolId) return;
-    // Strict school_id filter — never query without it
-    const [{ data: c }, { data: a }] = await Promise.all([
-      supabase.from("classes").select("id, name, grade").eq("school_id", schoolId).order("name"),
-    supabase.from("attendance_records").select("class_id, status").eq("school_id", schoolId).eq("date", today),
-    ]);
-    const cls = (c as ClassRow[]) ?? [];
-    setClasses(cls);
-    const classIds = cls.map((x) => x.id);
-    if (classIds.length) {
-      const { data: st } = await supabase.from("students").select("id, class_id").in("class_id", classIds);
-      setStudents((st as StudentRow[]) ?? []);
-    } else {
-      setStudents([]);
+    try {
+      const [c, a] = await Promise.all([
+        supabase.from("classes").select("id, name, grade").eq("school_id", schoolId).order("name"),
+        supabase.from("attendance_records").select("class_id, status").eq("school_id", schoolId).eq("date", today),
+      ]);
+      const cls = Array.isArray(c.data) ? (c.data as ClassRow[]) : [];
+      setClasses(cls);
+      const classIds = cls.map((x) => x.id);
+      if (classIds.length) {
+        const { data: st } = await supabase.from("students").select("id, class_id").in("class_id", classIds);
+        setStudents(Array.isArray(st) ? (st as StudentRow[]) : []);
+      } else {
+        setStudents([]);
+      }
+      setRecs(Array.isArray(a.data) ? (a.data as Attn[]) : []);
+    } catch {
+      // Keep prior state; never crash the dashboard on a transient query failure.
     }
-    setRecs((a as Attn[]) ?? []);
   };
 
   useEffect(() => {
@@ -184,9 +187,12 @@ function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; a
     if (!accessCode) return;
     try {
       const rows = await list({ data: { code: accessCode } });
-      setTeachers(rows as TeacherRow[]);
+      setTeachers(Array.isArray(rows) ? (rows as TeacherRow[]) : []);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to load teachers");
+      setTeachers([]);
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Failed to load teachers";
+      // Silent for the common "code not found" race; surface real errors only.
+      if (!/not found|unauthorized/i.test(msg)) toast.error(msg);
     }
   };
 
