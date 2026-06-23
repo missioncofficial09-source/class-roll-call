@@ -30,6 +30,36 @@ export const listTeacherClasses = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { schoolId } = await resolveSchoolId(data.code);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // If this is a teacher code (TCH-*), restrict to the class the principal
+    // assigned via school_teachers.class_id. Principal codes see all classes.
+    const cleaned = data.code.replace(/[\s-]+/g, "").toUpperCase();
+    const isTeacher = cleaned.startsWith("TCH");
+    if (isTeacher) {
+      const variants = {
+        dashed: `TCH-${cleaned.slice(3)}`,
+        bare: `TCH${cleaned.slice(3)}`,
+      };
+      const { data: teacher, error: tErr } = await supabaseAdmin
+        .from("school_teachers")
+        .select("class_id, school_id, is_active")
+        .or(`code.ilike.${variants.dashed},code.ilike.${variants.bare}`)
+        .eq("school_id", schoolId)
+        .maybeSingle();
+      if (tErr) throw new Response(tErr.message, { status: 500 });
+      if (teacher?.class_id) {
+        const { data: rows, error } = await supabaseAdmin
+          .from("classes")
+          .select("id, name, grade, school_id, whatsapp_group_name")
+          .eq("school_id", schoolId)
+          .eq("id", teacher.class_id);
+        if (error) throw new Response(error.message, { status: 500 });
+        return { schoolId, classes: rows ?? [] };
+      }
+      // No assignment yet → empty list (UI shows "No classes assigned yet").
+      return { schoolId, classes: [] };
+    }
+
     const { data: rows, error } = await supabaseAdmin
       .from("classes")
       .select("id, name, grade, school_id, whatsapp_group_name")
