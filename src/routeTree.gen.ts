@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPrincipalRouteImport } from './routes/_authenticated/principal'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as RClassIdDateRouteImport } from './routes/r.$classId.$date'
 import { Route as AdminPanelSchoolSchoolIdRouteImport } from './routes/admin-panel.school.$schoolId'
 import { Route as AuthenticatedPrincipalDetailKindRouteImport } from './routes/_authenticated/principal.detail.$kind'
 
@@ -59,6 +60,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const RClassIdDateRoute = RClassIdDateRouteImport.update({
+  id: '/r/$classId/$date',
+  path: '/r/$classId/$date',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminPanelSchoolSchoolIdRoute =
   AdminPanelSchoolSchoolIdRouteImport.update({
     id: '/school/$schoolId',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
+  '/r/$classId/$date': typeof RClassIdDateRoute
   '/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRoutesByTo {
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
+  '/r/$classId/$date': typeof RClassIdDateRoute
   '/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRoutesById {
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
+  '/r/$classId/$date': typeof RClassIdDateRoute
   '/_authenticated/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRouteTypes {
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/principal'
     | '/admin-panel/school/$schoolId'
+    | '/r/$classId/$date'
     | '/principal/detail/$kind'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/principal'
     | '/admin-panel/school/$schoolId'
+    | '/r/$classId/$date'
     | '/principal/detail/$kind'
   id:
     | '__root__'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/_authenticated/attendance'
     | '/_authenticated/principal'
     | '/admin-panel/school/$schoolId'
+    | '/r/$classId/$date'
     | '/_authenticated/principal/detail/$kind'
   fileRoutesById: FileRoutesById
 }
@@ -150,6 +162,7 @@ export interface RootRouteChildren {
   AdminPanelRoute: typeof AdminPanelRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  RClassIdDateRoute: typeof RClassIdDateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -209,6 +222,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/r/$classId/$date': {
+      id: '/r/$classId/$date'
+      path: '/r/$classId/$date'
+      fullPath: '/r/$classId/$date'
+      preLoaderRoute: typeof RClassIdDateRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin-panel/school/$schoolId': {
       id: '/admin-panel/school/$schoolId'
@@ -276,6 +296,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminPanelRoute: AdminPanelRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  RClassIdDateRoute: RClassIdDateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
