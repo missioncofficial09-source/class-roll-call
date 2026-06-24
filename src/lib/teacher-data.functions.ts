@@ -12,6 +12,23 @@ async function resolveSchoolId(rawCode: string): Promise<{ schoolId: string; rol
   const role = m[1] === "PRN" ? "principal" : "teacher";
   const suffix = m[2];
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // Teacher codes: resolve via school_teachers (principal-issued profiles).
+  // The teacher's TCH suffix does NOT need to match the school's PRN suffix.
+  if (role === "teacher") {
+    const { data: teacher, error: tErr } = await supabaseAdmin
+      .from("school_teachers")
+      .select("school_id, is_active, schools(is_active)")
+      .or(`code.ilike.TCH-${suffix},code.ilike.TCH${suffix}`)
+      .maybeSingle();
+    if (tErr) throw new Response(tErr.message, { status: 500 });
+    if (!teacher) throw new Response("Access code not found", { status: 401 });
+    if (teacher.is_active === false) throw new Response("Teacher disabled", { status: 403 });
+    if ((teacher as any).schools?.is_active === false) throw new Response("School disabled", { status: 403 });
+    return { schoolId: teacher.school_id as string, role };
+  }
+
+  // Principal codes: resolve via schools table by PRN code.
   const { data: school, error } = await supabaseAdmin
     .from("schools")
     .select("id, is_active")
