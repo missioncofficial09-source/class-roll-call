@@ -249,9 +249,16 @@ function AttendancePage() {
     try {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
-      if (!token) throw new Error("Please sign in again");
+      if (!token && !code) throw new Error("Please sign in again");
       const { base64, mimeType } = await fileToCompressedBase64(file);
-      const res = await extractFn({ data: { imageBase64: base64, mimeType, accessToken: token } });
+      const res = await extractFn({
+        data: {
+          imageBase64: base64,
+          mimeType,
+          ...(token ? { accessToken: token } : {}),
+          ...(code ? { code } : {}),
+        },
+      });
       const names = (res?.names ?? []) as string[];
       if (names.length === 0) toast.warning("No names detected. Try a clearer photo.");
       setImportNames(names);
