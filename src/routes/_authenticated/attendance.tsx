@@ -398,9 +398,9 @@ function AttendancePage() {
             size="sm"
             onClick={() => cameraInputRef.current?.click()}
             disabled={!classId}
-            title="Scan register photo"
+            title="Upload register photo"
           >
-            <Camera className="h-4 w-4 mr-1.5" /> Scan register
+            <Camera className="h-4 w-4 mr-1.5" /> Upload register
           </Button>
           <Button
             variant="outline"
@@ -417,7 +417,6 @@ function AttendancePage() {
           ref={cameraInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="hidden"
           onChange={onCameraFile}
         />
