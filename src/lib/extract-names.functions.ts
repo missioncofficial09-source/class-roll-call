@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 const InputSchema = z.object({
   imageBase64: z.string().min(100),
   mimeType: z.string().default("image/jpeg"),
-  accessToken: z.string().min(10),
+  accessToken: z.string().min(10).optional(),
+  code: z.string().min(3).optional(),
 });
 
 export const extractNamesFromImage = createServerFn({ method: "POST" })
@@ -21,8 +22,31 @@ export const extractNamesFromImage = createServerFn({ method: "POST" })
     const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data: claims, error: authErr } = await sb.auth.getClaims(data.accessToken);
-    if (authErr || !claims?.claims?.sub) {
+    let authorized = false;
+    if (data.accessToken) {
+      const { data: claims, error: authErr } = await sb.auth.getClaims(data.accessToken);
+      if (!authErr && claims?.claims?.sub) authorized = true;
+    }
+    if (!authorized && data.code) {
+      const code = data.code.trim().toUpperCase();
+      if (code.startsWith("TCH-")) {
+        const { data: row } = await sb
+          .from("school_teachers")
+          .select("id")
+          .ilike("code", code)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (row?.id) authorized = true;
+      } else if (code.startsWith("PRN-")) {
+        const { data: row } = await sb
+          .from("schools")
+          .select("id")
+          .ilike("code", code)
+          .maybeSingle();
+        if (row?.id) authorized = true;
+      }
+    }
+    if (!authorized) {
       throw new Response("Unauthorized", { status: 401 });
     }
 
