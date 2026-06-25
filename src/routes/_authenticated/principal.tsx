@@ -14,6 +14,7 @@ import {
   createSchoolTeacher,
   deleteSchoolTeacher,
   updateSchoolTeacher,
+  getPrincipalDashboard,
 } from "@/lib/principal-teachers.functions";
 
 export const Route = createFileRoute("/_authenticated/principal")({
@@ -32,6 +33,7 @@ function PrincipalPage() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [recs, setRecs] = useState<Attn[]>([]);
+  const fetchDashboard = useServerFn(getPrincipalDashboard);
 
   useEffect(() => {
     if (loading) return;
@@ -41,39 +43,31 @@ function PrincipalPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const refresh = async () => {
-    if (!schoolId) return;
+    if (!accessCode) return;
     try {
-      const [c, a] = await Promise.all([
-        supabase.from("classes").select("id, name, grade").eq("school_id", schoolId).order("name"),
-        supabase.from("attendance_records").select("class_id, status").eq("school_id", schoolId).eq("date", today),
-      ]);
-      const cls = Array.isArray(c.data) ? (c.data as ClassRow[]) : [];
-      setClasses(cls);
-      const classIds = cls.map((x) => x.id);
-      if (classIds.length) {
-        const { data: st } = await supabase.from("students").select("id, class_id").in("class_id", classIds);
-        setStudents(Array.isArray(st) ? (st as StudentRow[]) : []);
-      } else {
-        setStudents([]);
-      }
-      setRecs(Array.isArray(a.data) ? (a.data as Attn[]) : []);
+      const res = await fetchDashboard({ data: { code: accessCode } });
+      setClasses(Array.isArray(res?.classes) ? (res.classes as ClassRow[]) : []);
+      setStudents(Array.isArray(res?.students) ? (res.students as StudentRow[]) : []);
+      setRecs(Array.isArray(res?.attendance) ? (res.attendance as Attn[]) : []);
     } catch {
       // Keep prior state; never crash the dashboard on a transient query failure.
     }
   };
 
   useEffect(() => {
-    if (!schoolId) return;
+    if (!accessCode) return;
     void refresh();
+    if (!schoolId) return;
     const channel = supabase
       .channel(`principal-${schoolId}`)
       .on("postgres_changes",
         { event: "*", schema: "public", table: "attendance_records", filter: `school_id=eq.${schoolId}` },
         () => { void refresh(); })
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    const poll = window.setInterval(() => { void refresh(); }, 15000);
+    return () => { void supabase.removeChannel(channel); window.clearInterval(poll); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolId]);
+  }, [accessCode, schoolId]);
 
   if (loading || (role !== "principal" && role !== "admin")) return null;
   if (!schoolId) {
