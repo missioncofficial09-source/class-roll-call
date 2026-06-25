@@ -169,3 +169,38 @@ export const listSchoolClassesForPrincipal = createServerFn({ method: "POST" })
     if (error) throw new Response(error.message, { status: 500 });
     return rows ?? [];
   });
+
+export const getPrincipalDashboard = createServerFn({ method: "POST" })
+  .inputValidator((d) => CodeOnly.parse(d))
+  .handler(async ({ data }) => {
+    const schoolId = await resolvePrincipalSchool(data.code);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const today = new Date().toISOString().slice(0, 10);
+    const [c, a] = await Promise.all([
+      supabaseAdmin
+        .from("classes")
+        .select("id, name, grade")
+        .eq("school_id", schoolId)
+        .order("name"),
+      supabaseAdmin
+        .from("attendance_records")
+        .select("student_id, class_id, status")
+        .eq("school_id", schoolId)
+        .eq("date", today),
+    ]);
+    if (c.error) throw new Response(c.error.message, { status: 500 });
+    if (a.error) throw new Response(a.error.message, { status: 500 });
+    const classes = c.data ?? [];
+    const classIds = classes.map((x) => x.id as string);
+    let students: Array<{ id: string; full_name: string; roll_number: number | null; class_id: string }> = [];
+    if (classIds.length) {
+      const { data: st, error: sErr } = await supabaseAdmin
+        .from("students")
+        .select("id, full_name, roll_number, class_id")
+        .in("class_id", classIds)
+        .order("full_name");
+      if (sErr) throw new Response(sErr.message, { status: 500 });
+      students = st ?? [];
+    }
+    return { schoolId, today, classes, students, attendance: a.data ?? [] };
+  });
