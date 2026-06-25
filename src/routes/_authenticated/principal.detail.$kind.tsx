@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft, BookOpen, Users, GraduationCap, Loader2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { getPrincipalDashboard } from "@/lib/principal-teachers.functions";
 
 type Kind = "classes" | "students" | "present" | "absent";
 
@@ -24,8 +25,9 @@ type AttnRow = { student_id: string; class_id: string; status: "present" | "abse
 
 function PrincipalDetailPage() {
   const { kind } = Route.useParams() as { kind: Kind };
-  const { role, schoolId, loading } = useAuth();
+  const { role, schoolId, accessCode, loading } = useAuth();
   const navigate = useNavigate();
+  const fetchDashboard = useServerFn(getPrincipalDashboard);
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -41,27 +43,19 @@ function PrincipalDetailPage() {
   const isValid = (["classes", "students", "present", "absent"] as Kind[]).includes(kind);
 
   useEffect(() => {
-    if (!schoolId || !isValid) return;
+    if (!accessCode || !isValid) return;
     setFetching(true);
     (async () => {
       try {
-        const { data: c } = await supabase
-          .from("classes").select("id, name, grade").eq("school_id", schoolId).order("name");
-        const cls = Array.isArray(c) ? (c as ClassRow[]) : [];
-        setClasses(cls);
-        const ids = cls.map((x) => x.id);
-        if (ids.length === 0) { setStudents([]); setAttn([]); return; }
-        const [s, a] = await Promise.all([
-          supabase.from("students").select("id, full_name, roll_number, class_id").in("class_id", ids).order("full_name"),
-          supabase.from("attendance_records").select("student_id, class_id, status").eq("school_id", schoolId).eq("date", today),
-        ]);
-        setStudents(Array.isArray(s.data) ? (s.data as StudentRow[]) : []);
-        setAttn(Array.isArray(a.data) ? (a.data as AttnRow[]) : []);
+        const res = await fetchDashboard({ data: { code: accessCode } });
+        setClasses(Array.isArray(res?.classes) ? (res.classes as ClassRow[]) : []);
+        setStudents(Array.isArray(res?.students) ? (res.students as StudentRow[]) : []);
+        setAttn(Array.isArray(res?.attendance) ? (res.attendance as AttnRow[]) : []);
       } finally {
         setFetching(false);
       }
     })();
-  }, [schoolId, isValid, today]);
+  }, [accessCode, isValid, today]);
 
   if (loading || (role !== "principal" && role !== "admin")) return null;
   if (!isValid) {
