@@ -203,14 +203,24 @@ function AttendancePage() {
   // so the browser navigates the top frame and bypasses CSP/popup blockers.
   const whatsappHref = useMemo(() => {
     if (!cls) return "https://wa.me/";
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const link = `${origin}/r/${cls.id}/${today}`;
     const dateLabel = new Date(today).toDateString();
+    const sorted = [...students].sort(
+      (a, b) => (a.roll_number ?? 9999) - (b.roll_number ?? 9999) || a.full_name.localeCompare(b.full_name),
+    );
+    const lines = sorted.map((s, i) => {
+      const status = marks[s.id];
+      const label = status === "present" ? "Present" : status === "absent" ? "Absent" : "-";
+      const roll = s.roll_number ?? i + 1;
+      return `${roll}. ${s.full_name} - ${label}`;
+    });
     const message =
-      `Attendance Report for ${dateLabel}: ${presentCount} Present, ${absentCount} Absent. ` +
-      `Click here to view: ${link}`;
+      `Attendance Report: ${dateLabel}\n` +
+      `${cls.name}${cls.grade ? ` (${cls.grade})` : ""}\n\n` +
+      `${lines.join("\n")}\n\n` +
+      `Total Present: ${presentCount}\n` +
+      `Total Absent: ${absentCount}`;
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
-  }, [cls, today, presentCount, absentCount]);
+  }, [cls, today, presentCount, absentCount, students, marks]);
 
   // ---- Image → names (resize + AI OCR) ----
   const fileToCompressedBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
