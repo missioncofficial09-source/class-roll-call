@@ -20,6 +20,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as RClassIdDateRouteImport } from './routes/r.$classId.$date'
 import { Route as AdminPanelSchoolSchoolIdRouteImport } from './routes/admin-panel.school.$schoolId'
 import { Route as AuthenticatedPrincipalDetailKindRouteImport } from './routes/_authenticated/principal.detail.$kind'
+import { Route as AuthenticatedPrincipalClassClassIdRouteImport } from './routes/_authenticated/principal.class.$classId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -77,6 +78,12 @@ const AuthenticatedPrincipalDetailKindRoute =
     path: '/detail/$kind',
     getParentRoute: () => AuthenticatedPrincipalRoute,
   } as any)
+const AuthenticatedPrincipalClassClassIdRoute =
+  AuthenticatedPrincipalClassClassIdRouteImport.update({
+    id: '/class/$classId',
+    path: '/class/$classId',
+    getParentRoute: () => AuthenticatedPrincipalRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
   '/r/$classId/$date': typeof RClassIdDateRoute
+  '/principal/class/$classId': typeof AuthenticatedPrincipalClassClassIdRoute
   '/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRoutesByTo {
@@ -100,6 +108,7 @@ export interface FileRoutesByTo {
   '/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
   '/r/$classId/$date': typeof RClassIdDateRoute
+  '/principal/class/$classId': typeof AuthenticatedPrincipalClassClassIdRoute
   '/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRoutesById {
@@ -114,6 +123,7 @@ export interface FileRoutesById {
   '/_authenticated/principal': typeof AuthenticatedPrincipalRouteWithChildren
   '/admin-panel/school/$schoolId': typeof AdminPanelSchoolSchoolIdRoute
   '/r/$classId/$date': typeof RClassIdDateRoute
+  '/_authenticated/principal/class/$classId': typeof AuthenticatedPrincipalClassClassIdRoute
   '/_authenticated/principal/detail/$kind': typeof AuthenticatedPrincipalDetailKindRoute
 }
 export interface FileRouteTypes {
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/principal'
     | '/admin-panel/school/$schoolId'
     | '/r/$classId/$date'
+    | '/principal/class/$classId'
     | '/principal/detail/$kind'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/principal'
     | '/admin-panel/school/$schoolId'
     | '/r/$classId/$date'
+    | '/principal/class/$classId'
     | '/principal/detail/$kind'
   id:
     | '__root__'
@@ -153,6 +165,7 @@ export interface FileRouteTypes {
     | '/_authenticated/principal'
     | '/admin-panel/school/$schoolId'
     | '/r/$classId/$date'
+    | '/_authenticated/principal/class/$classId'
     | '/_authenticated/principal/detail/$kind'
   fileRoutesById: FileRoutesById
 }
@@ -244,15 +257,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPrincipalDetailKindRouteImport
       parentRoute: typeof AuthenticatedPrincipalRoute
     }
+    '/_authenticated/principal/class/$classId': {
+      id: '/_authenticated/principal/class/$classId'
+      path: '/class/$classId'
+      fullPath: '/principal/class/$classId'
+      preLoaderRoute: typeof AuthenticatedPrincipalClassClassIdRouteImport
+      parentRoute: typeof AuthenticatedPrincipalRoute
+    }
   }
 }
 
 interface AuthenticatedPrincipalRouteChildren {
+  AuthenticatedPrincipalClassClassIdRoute: typeof AuthenticatedPrincipalClassClassIdRoute
   AuthenticatedPrincipalDetailKindRoute: typeof AuthenticatedPrincipalDetailKindRoute
 }
 
 const AuthenticatedPrincipalRouteChildren: AuthenticatedPrincipalRouteChildren =
   {
+    AuthenticatedPrincipalClassClassIdRoute:
+      AuthenticatedPrincipalClassClassIdRoute,
     AuthenticatedPrincipalDetailKindRoute:
       AuthenticatedPrincipalDetailKindRoute,
   }
