@@ -115,12 +115,19 @@ function PrincipalPage() {
             const a = r.filter((x) => x.status === "absent").length;
             const pct = p + a ? Math.round((p / (p + a)) * 100) : 0;
             return (
-              <li key={c.id} className="p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{c.name}{c.grade ? ` · ${c.grade}` : ""}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{p} present · {a} absent · {r.length}/{total} marked</div>
-                </div>
-                <div className="text-right tabular-nums w-12 text-sm font-semibold">{pct}%</div>
+              <li key={c.id}>
+                <Link
+                  to="/principal/class/$classId"
+                  params={{ classId: c.id }}
+                  className="p-4 flex items-center gap-4 hover:bg-muted/40 transition-colors focus:outline-none focus:bg-muted/40"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{c.name}{c.grade ? ` · ${c.grade}` : ""}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{p} present · {a} absent · {r.length}/{total} marked</div>
+                  </div>
+                  <div className="text-right tabular-nums w-12 text-sm font-semibold">{pct}%</div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
               </li>
             );
           })}
