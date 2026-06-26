@@ -202,6 +202,21 @@ function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; a
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessCode]);
 
+  // Realtime: refresh whenever school_teachers changes.
+  useEffect(() => {
+    if (!accessCode) return;
+    const channel = supabase
+      .channel(`school-teachers-${accessCode}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_teachers" },
+        () => { void refresh(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessCode]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accessCode) return toast.error("Missing principal code");
@@ -216,9 +231,11 @@ function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; a
     };
     const maxAttempts = 3;
     let lastErr: unknown = null;
+    let createdId: string | null = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await create({ data: payload });
+        const res = (await create({ data: payload })) as { id?: string } | undefined;
+        createdId = res?.id ?? null;
         lastErr = null;
         break;
       } catch (err) {
@@ -234,9 +251,22 @@ function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; a
       setBusy(false);
       return;
     }
-    try {
-      await refresh();
-    } catch { /* refresh handles its own toast */ }
+    // Verify the new record is visible via the list query before announcing success.
+    let verified = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const rows = (await list({ data: { code: accessCode } })) as TeacherRow[];
+        const safe = Array.isArray(rows) ? rows : [];
+        setTeachers(safe);
+        if (!createdId || safe.some((r) => r.id === createdId)) { verified = true; break; }
+      } catch { /* swallow and retry */ }
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+    if (!verified) {
+      toast.error("Saved, but the list didn't refresh. Try reloading.");
+      setBusy(false);
+      return;
+    }
     toast.success("Teacher created");
     setFullName("");
     setCodeSuffix("");
