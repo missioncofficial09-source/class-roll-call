@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Users, BookOpen, GraduationCap, CircleDot, UserPlus, Trash2, Copy, ChevronRight } from "lucide-react";
+import { Users, BookOpen, GraduationCap, CircleDot, UserPlus, Trash2, Copy, ChevronRight, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,26 +206,42 @@ function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; a
     e.preventDefault();
     if (!accessCode) return toast.error("Missing principal code");
     if (!fullName.trim() || !codeSuffix.trim()) return toast.error("Name and code are required");
+    if (busy) return;
     setBusy(true);
-    try {
-      await create({
-        data: {
-          code: accessCode,
-          fullName: fullName.trim(),
-          teacherCode: codeSuffix.trim(),
-          className: className.trim() || null,
-        },
-      });
-      toast.success("Teacher created");
-      setFullName("");
-      setCodeSuffix("");
-      setClassName("");
-      await refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create teacher");
-    } finally {
-      setBusy(false);
+    const payload = {
+      code: accessCode,
+      fullName: fullName.trim(),
+      teacherCode: codeSuffix.trim(),
+      className: className.trim() || null,
+    };
+    const maxAttempts = 3;
+    let lastErr: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await create({ data: payload });
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        // Don't retry validation / conflict errors — they won't succeed on retry.
+        if (/already in use|required|not found|unauthorized|disabled|400|401|403|409/i.test(msg)) break;
+        if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 600 * attempt));
+      }
     }
+    if (lastErr) {
+      toast.error(lastErr instanceof Error ? lastErr.message : "Failed to create teacher");
+      setBusy(false);
+      return;
+    }
+    try {
+      await refresh();
+    } catch { /* refresh handles its own toast */ }
+    toast.success("Teacher created");
+    setFullName("");
+    setCodeSuffix("");
+    setClassName("");
+    setBusy(false);
   };
 
   const onAssign = async (teacherId: string, value: string) => {
@@ -289,7 +305,9 @@ function TeachersTab({ classes: _classes, accessCode }: { classes: ClassRow[]; a
           </div>
         </div>
         <div className="mt-4 flex justify-end">
-          <Button type="submit" disabled={busy}>{busy ? "Creating…" : "Create teacher"}</Button>
+          <Button type="submit" disabled={busy} aria-busy={busy}>
+            {busy ? (<><Loader2 className="h-4 w-4 animate-spin" /> Creating…</>) : "Create teacher"}
+          </Button>
         </div>
       </form>
 
