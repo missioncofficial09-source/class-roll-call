@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, MessageCircle, Save, Users, Camera, Mic, MicOff, Loader2, Trash2, Plus } from "lucide-react";
+import { Check, X, MessageCircle, Users, Camera, Mic, MicOff, Loader2, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -223,6 +223,8 @@ function AttendancePage() {
 
   const sendToWhatsApp = async () => {
     if (!whatsappMessage) { toast.error("Pick a class first"); return; }
+    // Save first so the Principal dashboard syncs immediately.
+    await save();
     // Copy to clipboard as a reliable fallback — teachers can paste into any chat.
     try { await navigator.clipboard.writeText(whatsappMessage); } catch { /* noop */ }
     const encoded = encodeURIComponent(whatsappMessage);
@@ -490,16 +492,18 @@ function AttendancePage() {
       {students.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border p-3 sm:p-4 z-20">
           <div className="mx-auto max-w-3xl flex gap-3">
-            <Button variant="outline" size="lg" onClick={save} disabled={saving} className="flex-1 sm:flex-none">
-              <Save className="h-4 w-4 mr-2" /> {saving ? "Saving…" : "Save"}
-            </Button>
             <button
               type="button"
               onClick={sendToWhatsApp}
-              className="flex-1 h-12 inline-flex items-center justify-center rounded-md text-base font-semibold text-success-foreground hover:opacity-90 transition-opacity"
+              disabled={saving}
+              className="flex-1 h-12 inline-flex items-center justify-center rounded-md text-base font-semibold text-success-foreground hover:opacity-90 transition-opacity disabled:opacity-70"
               style={{ background: "linear-gradient(135deg, oklch(0.62 0.16 150), oklch(0.55 0.17 155))" }}
             >
-              <MessageCircle className="h-5 w-5 mr-2" /> Send to WhatsApp
+              {saving ? (
+                <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving…</>
+              ) : (
+                <><MessageCircle className="h-5 w-5 mr-2" /> Save & Send to WhatsApp</>
+              )}
             </button>
           </div>
         </div>
