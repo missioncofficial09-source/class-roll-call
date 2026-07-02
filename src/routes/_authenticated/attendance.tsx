@@ -115,6 +115,9 @@ function AttendancePage() {
   // Load students + today's existing attendance
   useEffect(() => {
     if (!classId) { setStudents([]); setMarks({}); setWeeklyRecords([]); return; }
+    // Reset marks immediately so a new day never shows yesterday's ticks
+    // while the fresh query is in flight.
+    setMarks({});
     setLoadingStudents(true);
     const weekStart = shiftDateKey(today, -6);
     (async () => {
@@ -127,7 +130,12 @@ function AttendancePage() {
           setStudents((s as Student[]) ?? []);
           setWeeklyRecords((weekly as WeeklyRecord[]) ?? []);
           const m: Record<string, Status> = {};
-          (weekly ?? []).forEach((r: any) => { if (r.date === today) m[r.student_id] = r.status; });
+          (weekly ?? []).forEach((r: any) => {
+            // Normalise — Postgres DATE columns can serialise as "YYYY-MM-DD"
+            // or as an ISO timestamp depending on the query path.
+            const day = String(r.date ?? "").slice(0, 10);
+            if (day === today) m[r.student_id] = r.status;
+          });
           setMarks(m);
         } else {
           const [{ data: s, error: e1 }, { data: a }, { data: weekly }] = await Promise.all([
@@ -140,6 +148,7 @@ function AttendancePage() {
           setWeeklyRecords((weekly as WeeklyRecord[]) ?? []);
           const m: Record<string, Status> = {};
           (a ?? []).forEach((r: any) => { m[r.student_id] = r.status; });
+          // The query already filters by today's date, so no extra date check needed.
           setMarks(m);
         }
       } catch (err: any) {
