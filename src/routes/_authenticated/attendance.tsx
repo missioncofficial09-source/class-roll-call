@@ -199,10 +199,9 @@ function AttendancePage() {
     }
   };
 
-  // Build the wa.me URL from current state — used as a direct <a href>
-  // so the browser navigates the top frame and bypasses CSP/popup blockers.
-  const whatsappHref = useMemo(() => {
-    if (!cls) return "https://wa.me/";
+  // Build the plain-text WhatsApp message (no URLs, no link previews).
+  const whatsappMessage = useMemo(() => {
+    if (!cls) return "";
     const dateLabel = new Date(today).toDateString();
     const sorted = [...students].sort(
       (a, b) => (a.roll_number ?? 9999) - (b.roll_number ?? 9999) || a.full_name.localeCompare(b.full_name),
@@ -213,14 +212,30 @@ function AttendancePage() {
       const roll = s.roll_number ?? i + 1;
       return `${roll}. ${s.full_name} - ${label}`;
     });
-    const message =
+    return (
       `Attendance Report: ${dateLabel}\n` +
       `${cls.name}${cls.grade ? ` (${cls.grade})` : ""}\n\n` +
       `${lines.join("\n")}\n\n` +
       `Total Present: ${presentCount}\n` +
-      `Total Absent: ${absentCount}`;
-    return `https://wa.me/?text=${encodeURIComponent(message)}`;
+      `Total Absent: ${absentCount}`
+    );
   }, [cls, today, presentCount, absentCount, students, marks]);
+
+  const sendToWhatsApp = async () => {
+    if (!whatsappMessage) { toast.error("Pick a class first"); return; }
+    // Copy to clipboard as a reliable fallback — teachers can paste into any chat.
+    try { await navigator.clipboard.writeText(whatsappMessage); } catch { /* noop */ }
+    const encoded = encodeURIComponent(whatsappMessage);
+    // api.whatsapp.com does not render a link-preview card for the wa.me domain
+    // and handles long text more reliably than wa.me on mobile browsers.
+    const url = `https://api.whatsapp.com/send?text=${encoded}`;
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (!win) {
+      // Popup blocked — navigate the top frame instead.
+      try { window.top!.location.href = url; } catch { window.location.href = url; }
+    }
+    toast.success("Message copied. Opening WhatsApp…");
+  };
 
   // ---- Image → names (resize + AI OCR) ----
   const fileToCompressedBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
@@ -478,15 +493,14 @@ function AttendancePage() {
             <Button variant="outline" size="lg" onClick={save} disabled={saving} className="flex-1 sm:flex-none">
               <Save className="h-4 w-4 mr-2" /> {saving ? "Saving…" : "Save"}
             </Button>
-            <a
-              href={whatsappHref}
-              target="_top"
-              rel="noopener"
+            <button
+              type="button"
+              onClick={sendToWhatsApp}
               className="flex-1 h-12 inline-flex items-center justify-center rounded-md text-base font-semibold text-success-foreground hover:opacity-90 transition-opacity"
               style={{ background: "linear-gradient(135deg, oklch(0.62 0.16 150), oklch(0.55 0.17 155))" }}
             >
               <MessageCircle className="h-5 w-5 mr-2" /> Send to WhatsApp
-            </a>
+            </button>
           </div>
         </div>
       )}
